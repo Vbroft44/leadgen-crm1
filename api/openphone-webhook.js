@@ -1,58 +1,43 @@
-// ESM version for Vercel Node.js 20
-import { createClient } from '@supabase/supabase-js';
+// Tell Vercel to use Node.js 20
+export const config = {
+  runtime: "nodejs20.x"
+};
+
+import { createClient } from "@supabase/supabase-js";
+
+// Initialize Supabase client with service role key (for server-side use only!)
+const supabase = createClient(
+  process.env.VITE_SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY
+);
 
 export default async function handler(req, res) {
+  if (req.method !== "POST") {
+    return res.status(405).json({ error: "Method not allowed" });
+  }
+
   try {
-    const secret = process.env.OPENPHONE_WEBHOOK_SECRET;
-    const provided = req.headers['x-api-key'] || req.query['api_key'];
-    if (!secret || provided !== secret) {
-      return res.status(401).json({ ok: false, error: 'Unauthorized' });
+    const secret = req.headers["x-openphone-secret"];
+    if (secret !== process.env.OPENPHONE_WEBHOOK_SECRET) {
+      return res.status(401).json({ error: "Invalid secret" });
     }
 
-    const supabase = createClient(
-      process.env.VITE_SUPABASE_URL,
-      process.env.SUPABASE_SERVICE_ROLE_KEY,
-      { auth: { persistSession: false } }
-    );
+    const event = req.body;
 
-    const event = req.body || {};
-    const phone =
-      event?.from?.phoneNumber ||
-      event?.contact?.phone ||
-      event?.caller_number ||
-      null;
-
-    // Insert activity
-    const { data: activity, error: aerr } = await supabase
-      .from('activities')
-      .insert({
-        kind: event.type || event.event || 'unknown',
-        phone,
-        payload: event
-      })
-      .select()
-      .single();
-
-    if (aerr) throw aerr;
-
-    // Best-effort link to a lead by last 7 digits
-    if (phone) {
-      const last7 = phone.slice(-7);
-      const { data: lead } = await supabase
-        .from('leads')
-        .select('id')
-        .like('phone', `%${last7}%`)
-        .limit(1)
-        .maybeSingle();
-
-      if (lead?.id) {
-        await supabase.from('activities').update({ lead_id: lead.id }).eq('id', activity.id);
-        await supabase.from('leads').update({ updated_at: new Date().toISOString() }).eq('id', lead.id);
+    // Example: save call log into Supabase
+    const { error } = await supabase.from("activities").insert([
+      {
+        type: event.type || "unknown",
+        data: event,
+        created_at: new Date().toISOString()
       }
-    }
+    ]);
 
-    return res.status(200).json({ ok: true });
-  } catch (e) {
-    return res.status(500).json({ ok: false, error: e?.message || String(e) });
+    if (error) throw error;
+
+    return res.status(200).json({ success: true });
+  } catch (err) {
+    console.error("Webhook error:", err);
+    return res.status(500).json({ error: "Internal server error" });
   }
 }
