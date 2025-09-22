@@ -1,6 +1,3 @@
-// Force Node.js 20 for this single function
-export const config = { runtime: "nodejs20.x" };
-
 import { createClient } from "@supabase/supabase-js";
 
 const supabase = createClient(
@@ -13,7 +10,6 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  // Validate shared secret from OpenPhone
   const provided = req.headers["x-api-key"];
   if (!provided || provided !== process.env.OPENPHONE_WEBHOOK_SECRET) {
     return res.status(401).json({ error: "Unauthorized" });
@@ -22,7 +18,6 @@ export default async function handler(req, res) {
   try {
     const event = req.body || {};
 
-    // store activity
     const { data: activity, error } = await supabase
       .from("activities")
       .insert({
@@ -39,7 +34,6 @@ export default async function handler(req, res) {
 
     if (error) throw error;
 
-    // best-effort link to a lead by last 7 digits
     if (activity?.phone) {
       const last7 = String(activity.phone).slice(-7);
       const { data: lead } = await supabase
@@ -51,3 +45,15 @@ export default async function handler(req, res) {
 
       if (lead?.id) {
         await supabase
+          .from("activities")
+          .update({ lead_id: lead.id })
+          .eq("id", activity.id);
+      }
+    }
+
+    return res.status(200).json({ ok: true });
+  } catch (e) {
+    console.error("webhook error:", e);
+    return res.status(500).json({ error: e?.message || String(e) });
+  }
+}
