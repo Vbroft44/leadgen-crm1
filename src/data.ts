@@ -1,16 +1,15 @@
-// ./data.ts
-import { createClient } from "@supabase/supabase-js";
+// data.ts
+import { createClient } from '@supabase/supabase-js';
 
-const supabase = createClient(
-  import.meta.env.VITE_SUPABASE_URL!,
-  import.meta.env.VITE_SUPABASE_ANON_KEY!
-);
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL as string;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
 
-// ---- Leads ----
+export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
+// Fetch leads (includes OpenPhone fields)
 export async function fetchLeads() {
   const { data, error } = await supabase
-    .from("leads")
+    .from('leads')
     .select(`
       id,
       customer_name,
@@ -28,18 +27,15 @@ export async function fetchLeads() {
       updated_at,
       first_contact_at,
       inbound_line_name,
-      inbound_line_number,
-      openphone_conversation_url,
-      deleted_at
+      openphone_conversation_url
     `)
-    .is("deleted_at", null) // hide soft-deleted
-    .order("first_contact_at", { ascending: false })
-    .order("created_at", { ascending: false });
+    .order('id', { ascending: false });
 
   if (error) throw error;
-  return data ?? [];
+  return data || [];
 }
 
+// Add a lead (manual add from modal)
 export async function addLead(payload: {
   customer_name: string;
   phone: string;
@@ -53,37 +49,42 @@ export async function addLead(payload: {
   notes?: string | null;
 }) {
   const { data, error } = await supabase
-    .from("leads")
+    .from('leads')
     .insert(payload)
-    .select("id")
+    .select('id')
     .single();
+
   if (error) throw error;
-  return data;
+  return data!;
 }
 
-export async function updateLead(id: number, updates: Record<string, any>) {
+// Update a lead
+export async function updateLead(id: number, updates: any) {
   const { error } = await supabase
-    .from("leads")
+    .from('leads')
     .update(updates)
-    .eq("id", id);
+    .eq('id', id);
+
   if (error) throw error;
 }
 
+// Delete a lead
 export async function deleteLead(id: number) {
   const { error } = await supabase
-    .from("leads")
-    .update({ deleted_at: new Date().toISOString() })
-    .eq("id", id);
+    .from('leads')
+    .delete()
+    .eq('id', id);
+
   if (error) throw error;
 }
 
-// ---- Technicians ----
-
+// Technicians list (unchanged)
 export async function fetchTechnicians() {
   const { data, error } = await supabase
-    .from("technicians")
-    .select("name, trade")
-    .order("name", { ascending: true });
+    .from('technicians')
+    .select('name, trade')
+    .order('name', { ascending: true });
+
   if (error) throw error;
-  return data ?? [];
+  return data || [];
 }
