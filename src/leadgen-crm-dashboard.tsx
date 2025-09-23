@@ -47,20 +47,25 @@ const LeadGenCRM = () => {
       const data = await fetchLeads();
       // Map DB -> UI shape
       const mapped = data.map(d => ({
-        id: d.id,
-        customerName: d.customer_name,
-        phone: d.phone,
-        email: d.email || '',
-        address: d.address || '',
-        serviceNeeded: d.service_needed,
-        status: d.status,
-        dateAdded: new Date(d.created_at),
-        appointmentDate: d.appointment_date,
-        appointmentTime: d.appointment_time || '',
-        technician: d.technician || '',
-        notes: d.notes || '',
-        lastUpdated: new Date(d.updated_at)
-      }));
+  id: d.id,
+  customerName: d.customer_name,
+  phone: d.phone || d.phone_e164 || '',
+  email: d.email || '',
+  address: d.address || '',
+  serviceNeeded: d.service_needed,
+  status: d.status,
+  // Prefer first contact time if available
+  dateAdded: new Date(d.first_contact_at || d.created_at),
+  appointmentDate: d.appointment_date,
+  appointmentTime: d.appointment_time || '',
+  technician: d.technician || '',
+  notes: d.notes || '',
+  lastUpdated: new Date(d.updated_at),
+
+  // NEW:
+  lineName: d.inbound_line_name || '',
+  openphoneUrl: d.openphone_conversation_url || ''
+}));
       setLeads(mapped);
     })();
   }, []);
