@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { fetchLeads, addLead, updateLead, fetchTechnicians } from './data';
+import { fetchLeads, addLead, updateLead, fetchTechnicians, deleteLead } from './data';
 import { 
   Phone, 
   Mail, 
@@ -16,7 +16,9 @@ import {
   CheckCircle,
   XCircle,
   AlertCircle,
-  RotateCcw
+  RotateCcw,
+  ExternalLink,   // ⬅️ add
+  Trash2          // ⬅️ add
 } from 'lucide-react';
 
 const LeadGenCRM = () => {
