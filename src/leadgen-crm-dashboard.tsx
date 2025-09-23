@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { fetchLeads, addLead, updateLead, fetchTechnicians, deleteLead } from './data';
-import { 
-  Phone, 
-  Mail, 
-  Calendar, 
+import {
+  Phone,
+  Mail,
+  Calendar,
   Clock,
   Plus,
   Bell,
@@ -17,55 +17,55 @@ import {
   XCircle,
   AlertCircle,
   RotateCcw,
-  ExternalLink,   // ⬅️ add
-  Trash2          // ⬅️ add
+  ExternalLink,
+  Trash2
 } from 'lucide-react';
 
 const LeadGenCRM = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [showAddLead, setShowAddLead] = useState(false);
-  const [selectedLead, setSelectedLead] = useState(null);
-  
+  const [selectedLead, setSelectedLead] = useState<any | null>(null);
+
   const statusOptions = [
-    { value: 'new', label: 'New Lead', color: 'bg-blue-500', textColor: 'text-white' },
-    { value: 'waiting-customer', label: 'Waiting for Customer', color: 'bg-yellow-500', textColor: 'text-white' },
-    { value: 'waiting-tech', label: 'Waiting for Technician', color: 'bg-orange-500', textColor: 'text-white' },
-    { value: 'booked', label: 'Appointment Booked', color: 'bg-green-500', textColor: 'text-white' },
-    { value: 'completed', label: 'Completed', color: 'bg-gray-600', textColor: 'text-white' },
-    { value: 'canceled', label: 'Canceled', color: 'bg-red-500', textColor: 'text-white' },
-    { value: 'rescheduled', label: 'Rescheduled', color: 'bg-purple-500', textColor: 'text-white' }
+    { value: 'new',               label: 'New Lead',               color: 'bg-blue-500',   textColor: 'text-white' },
+    { value: 'waiting-customer',  label: 'Waiting for Customer',   color: 'bg-yellow-500', textColor: 'text-white' },
+    { value: 'waiting-tech',      label: 'Waiting for Technician', color: 'bg-orange-500', textColor: 'text-white' },
+    { value: 'booked',            label: 'Appointment Booked',     color: 'bg-green-500',  textColor: 'text-white' },
+    { value: 'completed',         label: 'Completed',              color: 'bg-gray-600',   textColor: 'text-white' },
+    { value: 'canceled',          label: 'Canceled',               color: 'bg-red-500',    textColor: 'text-white' },
+    { value: 'rescheduled',       label: 'Rescheduled',            color: 'bg-purple-500', textColor: 'text-white' }
   ];
 
   const [technicians, setTechnicians] = useState<string[]>([]);
-
   const [leads, setLeads] = useState<any[]>([]);
 
   useEffect(() => {
     (async () => {
       const t = await fetchTechnicians();
-      setTechnicians(t.map(tt => `${tt.name} - ${tt.trade}`));
-      const data = await fetchLeads();
-      // Map DB -> UI shape
-      const mapped = data.map(d => ({
-  id: d.id,
-  customerName: d.customer_name,
-  phone: d.phone || d.phone_e164 || '',
-  email: d.email || '',
-  address: d.address || '',
-  serviceNeeded: d.service_needed,
-  status: d.status,
-  // Prefer first contact time if available
-  dateAdded: new Date(d.first_contact_at || d.created_at),
-  appointmentDate: d.appointment_date,
-  appointmentTime: d.appointment_time || '',
-  technician: d.technician || '',
-  notes: d.notes || '',
-  lastUpdated: new Date(d.updated_at),
+      setTechnicians(t.map((tt: any) => `${tt.name} - ${tt.trade}`));
 
-  // NEW:
-  lineName: d.inbound_line_name || '',
-  openphoneUrl: d.openphone_conversation_url || ''
-}));
+      const data = await fetchLeads();
+      const mapped = data.map((d: any) => ({
+        id: d.id,
+        customerName: d.customer_name,
+        phone: d.phone || d.phone_e164 || '',
+        email: d.email || '',
+        address: d.address || '',
+        serviceNeeded: d.service_needed,
+        status: d.status,
+        // Prefer first contact time if available
+        dateAdded: new Date(d.first_contact_at || d.created_at),
+        appointmentDate: d.appointment_date,
+        appointmentTime: d.appointment_time || '',
+        technician: d.technician || '',
+        notes: d.notes || '',
+        lastUpdated: new Date(d.updated_at),
+
+        // NEW FIELDS FROM OPENPHONE SYNC:
+        lineName: d.inbound_line_name || '',
+        openphoneUrl: d.openphone_conversation_url || ''
+      }));
+
       setLeads(mapped);
     })();
   }, []);
@@ -79,35 +79,31 @@ const LeadGenCRM = () => {
     notes: ''
   });
 
-  // Get leads by status
-  const getLeadsByStatus = (status) => leads.filter(lead => lead.status === status);
-  
-  // Get status info
-  const getStatusInfo = (status) => statusOptions.find(s => s.value === status);
+  // Helpers
+  const getLeadsByStatus = (status: string) => leads.filter(lead => lead.status === status);
+  const getStatusInfo = (status: string) => statusOptions.find(s => s.value === status);
 
-  // Check if lead needs reminder (older than 2 hours and not completed/canceled)
-  const needsReminder = (lead) => {
+  const needsReminder = (lead: any) => {
     if (lead.status === 'completed' || lead.status === 'canceled') return false;
-    const hoursOld = (new Date() - new Date(lead.lastUpdated)) / (1000 * 60 * 60);
+    const hoursOld = (new Date().getTime() - new Date(lead.lastUpdated).getTime()) / (1000 * 60 * 60);
     return hoursOld > 2;
   };
 
-  // Get active leads count
-  const getActiveLeadsCount = () => {
-    return leads.filter(lead => 
-      lead.status !== 'completed' && lead.status !== 'canceled'
-    ).length;
+  const getActiveLeadsCount = () =>
+    leads.filter(lead => lead.status !== 'completed' && lead.status !== 'canceled').length;
+
+  // Mutations
+  const handleStatusChange = async (leadId: number, newStatus: string) => {
+    setLeads(prev => prev.map(l => (l.id === leadId ? { ...l, status: newStatus, lastUpdated: new Date() } : l)));
+    try {
+      await updateLead(leadId, { status: newStatus });
+    } catch (e) {
+      console.error(e);
+    }
   };
 
-  // Handle status change
-  const handleStatusChange = async (leadId, newStatus) => {
-    setLeads(leads.map(lead => lead.id === leadId ? { ...lead, status: newStatus, lastUpdated: new Date() } : lead));
-    try { await updateLead(leadId, { status: newStatus }); } catch (e) { console.error(e); }
-  };
-
-  // Handle lead update
-  const handleLeadUpdate = async (leadId, updates) => {
-    setLeads(leads.map(lead => lead.id === leadId ? { ...lead, ...updates, lastUpdated: new Date() } : lead));
+  const handleLeadUpdate = async (leadId: number, updates: any) => {
+    setLeads(prev => prev.map(l => (l.id === leadId ? { ...l, ...updates, lastUpdated: new Date() } : l)));
     try {
       await updateLead(leadId, {
         customer_name: updates.customerName,
@@ -121,34 +117,32 @@ const LeadGenCRM = () => {
         technician: updates.technician,
         notes: updates.notes
       });
-    } catch (e) { console.error(e); }
+    } catch (e) {
+      console.error(e);
+    }
     setSelectedLead(null);
   };
-// Soft-delete a lead (remove from UI and Supabase)
-const handleDeleteLead = async (leadId: number) => {
-  const ok = window.confirm('Delete this lead? (You can re-create it later)');
-  if (!ok) return;
 
-  // Keep a copy in case the API call fails
-  const previous = [...leads];
+  // Soft-delete with optimistic update
+  const handleDeleteLead = async (leadId: number) => {
+    const ok = window.confirm('Delete this lead? (You can re-create it later)');
+    if (!ok) return;
 
-  // Optimistic UI: remove it right away
-  setLeads(prev => prev.filter(l => l.id !== leadId));
+    const previous = [...leads];
+    setLeads(prev => prev.filter(l => l.id !== leadId));
 
-  try {
-    await deleteLead(leadId);
-  } catch (err) {
-    console.error(err);
-    // Restore if it failed
-    setLeads(previous);
-    alert('Delete failed. Please try again.');
-  }
-};
+    try {
+      await deleteLead(leadId);
+    } catch (err) {
+      console.error(err);
+      setLeads(previous);
+      alert('Delete failed. Please try again.');
+    }
+  };
 
-  // Add new lead
   const handleAddLead = async () => {
     if (newLead.customerName && newLead.phone && newLead.serviceNeeded) {
-      const lead = {
+      const lead: any = {
         ...newLead,
         status: 'new',
         dateAdded: new Date(),
@@ -171,8 +165,10 @@ const handleDeleteLead = async (leadId: number) => {
           notes: newLead.notes || null
         });
         lead.id = created.id;
-        setLeads([lead, ...leads]);
-      } catch (e) { console.error(e); }
+        setLeads(prev => [lead, ...prev]);
+      } catch (e) {
+        console.error(e);
+      }
       setNewLead({
         customerName: '',
         phone: '',
@@ -185,19 +181,16 @@ const handleDeleteLead = async (leadId: number) => {
     }
   };
 
-  // Analytics calculations
+  // Analytics
   const getAnalytics = () => {
     const today = new Date().toDateString();
-    const todayLeads = leads.filter(lead => 
-      new Date(lead.dateAdded).toDateString() === today
-    );
-    
+    const todayLeads = leads.filter(lead => new Date(lead.dateAdded).toDateString() === today);
+
     return {
       totalToday: todayLeads.length,
       bookedToday: todayLeads.filter(l => l.status === 'booked').length,
-      completedToday: leads.filter(l => 
-        l.status === 'completed' && 
-        new Date(l.lastUpdated).toDateString() === today
+      completedToday: leads.filter(
+        l => l.status === 'completed' && new Date(l.lastUpdated).toDateString() === today
       ).length,
       canceledToday: todayLeads.filter(l => l.status === 'canceled').length,
       activeLeads: getActiveLeadsCount()
@@ -206,11 +199,11 @@ const handleDeleteLead = async (leadId: number) => {
 
   const analytics = getAnalytics();
 
-  // Lead Card Component
-  const LeadCard = ({ lead }) => {
+  // Lead Card
+  const LeadCard = ({ lead }: { lead: any }) => {
     const statusInfo = getStatusInfo(lead.status);
     const hasReminder = needsReminder(lead);
-    
+
     return (
       <div className="bg-white rounded-lg shadow-md border border-gray-200 p-4 hover:shadow-lg transition-shadow relative">
         {hasReminder && (
@@ -218,22 +211,60 @@ const handleDeleteLead = async (leadId: number) => {
             <Bell className="w-4 h-4 text-red-500 animate-pulse" />
           </div>
         )}
-        
+
         <div className="space-y-3">
-          {/* Customer Info */}
-          <div>
+          {/* Header: name + actions */}
+          <div className="flex items-start justify-between">
             <h3 className="font-semibold text-gray-900 text-lg">{lead.customerName}</h3>
-            <div className="flex items-center space-x-1 text-sm text-gray-600">
-              <Phone className="w-3 h-3" />
-              <span>{lead.phone}</span>
+            <div className="flex items-center gap-2">
+              {lead.openphoneUrl ? (
+                <a
+                  href={lead.openphoneUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-gray-400 hover:text-blue-600 transition-colors"
+                  title="Open conversation in OpenPhone"
+                >
+                  <ExternalLink className="w-4 h-4" />
+                </a>
+              ) : null}
+
+              <button
+                onClick={() => setSelectedLead(lead)}
+                className="text-gray-400 hover:text-blue-500 transition-colors"
+                title="Edit lead"
+              >
+                <Edit3 className="w-4 h-4" />
+              </button>
+
+              <button
+                onClick={() => handleDeleteLead(lead.id)}
+                className="text-gray-400 hover:text-red-500 transition-colors"
+                title="Delete lead"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
             </div>
-            {lead.email && (
-              <div className="flex items-center space-x-1 text-sm text-gray-600">
-                <Mail className="w-3 h-3" />
-                <span>{lead.email}</span>
-              </div>
-            )}
           </div>
+
+          {/* Phone / Email */}
+          <div className="flex items-center space-x-1 text-sm text-gray-600">
+            <Phone className="w-3 h-3" />
+            <span>{lead.phone}</span>
+          </div>
+          {lead.email && (
+            <div className="flex items-center space-x-1 text-sm text-gray-600">
+              <Mail className="w-3 h-3" />
+              <span>{lead.email}</span>
+            </div>
+          )}
+
+          {/* Line name (OpenPhone number name) */}
+          {lead.lineName && (
+            <div className="text-sm text-gray-600">
+              <span className="font-medium">Line:</span> {lead.lineName}
+            </div>
+          )}
 
           {/* Service & Address */}
           <div>
@@ -251,7 +282,9 @@ const handleDeleteLead = async (leadId: number) => {
             <div className="bg-green-50 p-2 rounded">
               <div className="flex items-center space-x-1 text-sm text-green-800">
                 <Calendar className="w-3 h-3" />
-                <span>{lead.appointmentDate} at {lead.appointmentTime}</span>
+                <span>
+                  {lead.appointmentDate} at {lead.appointmentTime}
+                </span>
               </div>
               {lead.technician && (
                 <div className="flex items-center space-x-1 text-sm text-green-800">
@@ -264,12 +297,10 @@ const handleDeleteLead = async (leadId: number) => {
 
           {/* Notes */}
           {lead.notes && (
-            <p className="text-sm text-gray-600 bg-gray-50 p-2 rounded line-clamp-2">
-              {lead.notes}
-            </p>
+            <p className="text-sm text-gray-600 bg-gray-50 p-2 rounded line-clamp-2">{lead.notes}</p>
           )}
 
-          {/* Status Dropdown & Edit */}
+          {/* Status */}
           <div className="flex items-center justify-between pt-2">
             <select
               value={lead.status}
@@ -282,13 +313,6 @@ const handleDeleteLead = async (leadId: number) => {
                 </option>
               ))}
             </select>
-            
-            <button
-              onClick={() => setSelectedLead(lead)}
-              className="text-gray-400 hover:text-blue-500 transition-colors"
-            >
-              <Edit3 className="w-4 h-4" />
-            </button>
           </div>
 
           {/* Time info */}
@@ -303,15 +327,15 @@ const handleDeleteLead = async (leadId: number) => {
 
   // Navigation
   const navItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: Home },
-    { id: 'new', label: 'New Leads', icon: AlertCircle, count: getLeadsByStatus('new').length },
-    { id: 'waiting-customer', label: 'Waiting for Customer', icon: Phone, count: getLeadsByStatus('waiting-customer').length },
-    { id: 'waiting-tech', label: 'Waiting for Tech', icon: Users, count: getLeadsByStatus('waiting-tech').length },
-    { id: 'booked', label: 'Appointment Booked', icon: Calendar, count: getLeadsByStatus('booked').length },
-    { id: 'rescheduled', label: 'Rescheduled', icon: RotateCcw, count: getLeadsByStatus('rescheduled').length },
-    { id: 'completed', label: 'Completed', icon: CheckCircle, count: getLeadsByStatus('completed').length },
-    { id: 'canceled', label: 'Canceled', icon: XCircle, count: getLeadsByStatus('canceled').length },
-    { id: 'analytics', label: 'Analytics', icon: BarChart3 }
+    { id: 'dashboard',          label: 'Dashboard',            icon: Home },
+    { id: 'new',                label: 'New Leads',            icon: AlertCircle, count: getLeadsByStatus('new').length },
+    { id: 'waiting-customer',   label: 'Waiting for Customer', icon: Phone,      count: getLeadsByStatus('waiting-customer').length },
+    { id: 'waiting-tech',       label: 'Waiting for Tech',     icon: Users,      count: getLeadsByStatus('waiting-tech').length },
+    { id: 'booked',             label: 'Appointment Booked',   icon: Calendar,   count: getLeadsByStatus('booked').length },
+    { id: 'rescheduled',        label: 'Rescheduled',          icon: RotateCcw,  count: getLeadsByStatus('rescheduled').length },
+    { id: 'completed',          label: 'Completed',            icon: CheckCircle,count: getLeadsByStatus('completed').length },
+    { id: 'canceled',           label: 'Canceled',             icon: XCircle,    count: getLeadsByStatus('canceled').length },
+    { id: 'analytics',          label: 'Analytics',            icon: BarChart3 }
   ];
 
   return (
@@ -326,13 +350,13 @@ const handleDeleteLead = async (leadId: number) => {
               </div>
               <h1 className="text-xl font-bold text-gray-900">Lead Generation CRM</h1>
             </div>
-            
+
             <div className="flex items-center space-x-4">
               <div className="flex items-center space-x-2 text-sm text-gray-600">
                 <Bell className="w-4 h-4" />
                 <span>{leads.filter(needsReminder).length} reminders</span>
               </div>
-              
+
               <button
                 onClick={() => setShowAddLead(true)}
                 className="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center space-x-2 hover:bg-blue-700 transition-colors"
@@ -345,6 +369,7 @@ const handleDeleteLead = async (leadId: number) => {
         </div>
       </header>
 
+      {/* Body */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <div className="flex space-x-6">
           {/* Sidebar */}
@@ -352,7 +377,7 @@ const handleDeleteLead = async (leadId: number) => {
             <nav className="bg-white rounded-lg shadow-sm border p-4">
               <ul className="space-y-2">
                 {navItems.map(item => {
-                  const Icon = item.icon;
+                  const Icon = item.icon as any;
                   return (
                     <li key={item.id}>
                       <button
@@ -368,9 +393,11 @@ const handleDeleteLead = async (leadId: number) => {
                           <span>{item.label}</span>
                         </div>
                         {item.count !== undefined && item.count > 0 && (
-                          <span className={`px-2 py-1 text-xs rounded-full ${
-                            activeTab === item.id ? 'bg-blue-200 text-blue-800' : 'bg-gray-200 text-gray-600'
-                          }`}>
+                          <span
+                            className={`px-2 py-1 text-xs rounded-full ${
+                              activeTab === item.id ? 'bg-blue-200 text-blue-800' : 'bg-gray-200 text-gray-600'
+                            }`}
+                          >
                             {item.count}
                           </span>
                         )}
@@ -410,7 +437,7 @@ const handleDeleteLead = async (leadId: number) => {
                   </div>
                 </div>
 
-                {/* Recent Activity */}
+                {/* Recent Leads */}
                 <div className="bg-white rounded-lg shadow-sm border">
                   <div className="p-4 border-b">
                     <h2 className="text-lg font-semibold text-gray-900">Recent Leads</h2>
@@ -448,21 +475,23 @@ const handleDeleteLead = async (leadId: number) => {
                       <div className="text-gray-600">Active Leads in Pipeline</div>
                     </div>
                   </div>
-                  
+
                   <div className="mt-8">
                     <h3 className="text-lg font-medium text-gray-900 mb-4">Pipeline Overview</h3>
                     <div className="space-y-3">
-                      {statusOptions.filter(status => status.value !== 'completed' && status.value !== 'canceled').map(status => {
-                        const count = getLeadsByStatus(status.value).length;
-                        return (
-                          <div key={status.value} className="flex items-center justify-between p-3 bg-gray-50 rounded">
-                            <span className="font-medium">{status.label}</span>
-                            <span className={`px-3 py-1 rounded-full text-white text-sm ${status.color}`}>
-                              {count} leads
-                            </span>
-                          </div>
-                        );
-                      })}
+                      {statusOptions
+                        .filter(s => s.value !== 'completed' && s.value !== 'canceled')
+                        .map(status => {
+                          const count = getLeadsByStatus(status.value).length;
+                          return (
+                            <div key={status.value} className="flex items-center justify-between p-3 bg-gray-50 rounded">
+                              <span className="font-medium">{status.label}</span>
+                              <span className={`px-3 py-1 rounded-full text-white text-sm ${status.color}`}>
+                                {count} leads
+                              </span>
+                            </div>
+                          );
+                        })}
                     </div>
                   </div>
                 </div>
@@ -476,17 +505,15 @@ const handleDeleteLead = async (leadId: number) => {
                   <h2 className="text-2xl font-bold text-gray-900">
                     {statusOptions.find(s => s.value === activeTab)?.label || 'Leads'}
                   </h2>
-                  <div className="text-sm text-gray-500">
-                    {getLeadsByStatus(activeTab).length} leads
-                  </div>
+                  <div className="text-sm text-gray-500">{getLeadsByStatus(activeTab).length} leads</div>
                 </div>
-                
+
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                   {getLeadsByStatus(activeTab).map(lead => (
                     <LeadCard key={lead.id} lead={lead} />
                   ))}
                 </div>
-                
+
                 {getLeadsByStatus(activeTab).length === 0 && (
                   <div className="bg-white rounded-lg shadow-sm border p-12 text-center">
                     <div className="text-gray-400 mb-4">
@@ -507,70 +534,70 @@ const handleDeleteLead = async (leadId: number) => {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-lg max-w-md w-full p-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Add New Lead</h3>
-            
+
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Customer Name *</label>
                 <input
                   type="text"
                   value={newLead.customerName}
-                  onChange={(e) => setNewLead({...newLead, customerName: e.target.value})}
+                  onChange={(e) => setNewLead({ ...newLead, customerName: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
                 />
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Phone *</label>
                 <input
                   type="tel"
                   value={newLead.phone}
-                  onChange={(e) => setNewLead({...newLead, phone: e.target.value})}
+                  onChange={(e) => setNewLead({ ...newLead, phone: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
                 />
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
                 <input
                   type="email"
                   value={newLead.email}
-                  onChange={(e) => setNewLead({...newLead, email: e.target.value})}
+                  onChange={(e) => setNewLead({ ...newLead, email: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
                 />
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Service Needed *</label>
                 <input
                   type="text"
                   value={newLead.serviceNeeded}
-                  onChange={(e) => setNewLead({...newLead, serviceNeeded: e.target.value})}
+                  onChange={(e) => setNewLead({ ...newLead, serviceNeeded: e.target.value })}
                   placeholder="e.g. HVAC Repair, Plumbing, Electrical"
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
                 />
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
                 <input
                   type="text"
                   value={newLead.address}
-                  onChange={(e) => setNewLead({...newLead, address: e.target.value})}
+                  onChange={(e) => setNewLead({ ...newLead, address: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
                 />
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
                 <textarea
                   value={newLead.notes}
-                  onChange={(e) => setNewLead({...newLead, notes: e.target.value})}
+                  onChange={(e) => setNewLead({ ...newLead, notes: e.target.value })}
                   rows={3}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
                 />
               </div>
             </div>
-            
+
             <div className="flex justify-end space-x-3 mt-6">
               <button
                 onClick={() => setShowAddLead(false)}
@@ -594,116 +621,145 @@ const handleDeleteLead = async (leadId: number) => {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-lg max-w-md w-full p-6 max-h-screen overflow-y-auto">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Edit Lead</h3>
-            
+
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Customer Name</label>
                 <input
                   type="text"
                   value={selectedLead.customerName}
-                  onChange={(e) => setSelectedLead({...selectedLead, customerName: e.target.value})}
+                  onChange={(e) => setSelectedLead({ ...selectedLead, customerName: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
                 />
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
                 <input
                   type="tel"
                   value={selectedLead.phone}
-                  onChange={(e) => setSelectedLead({...selectedLead, phone: e.target.value})}
+                  onChange={(e) => setSelectedLead({ ...selectedLead, phone: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
                 />
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
                 <input
                   type="email"
                   value={selectedLead.email}
-                  onChange={(e) => setSelectedLead({...selectedLead, email: e.target.value})}
+                  onChange={(e) => setSelectedLead({ ...selectedLead, email: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
                 />
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Service Needed</label>
                 <input
                   type="text"
                   value={selectedLead.serviceNeeded}
-                  onChange={(e) => setSelectedLead({...selectedLead, serviceNeeded: e.target.value})}
+                  onChange={(e) => setSelectedLead({ ...selectedLead, serviceNeeded: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
                 />
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
                 <input
                   type="text"
                   value={selectedLead.address}
-                  onChange={(e) => setSelectedLead({...selectedLead, address: e.target.value})}
+                  onChange={(e) => setSelectedLead({ ...selectedLead, address: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
                 />
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Technician</label>
                 <select
                   value={selectedLead.technician}
-                  onChange={(e) => setSelectedLead({...selectedLead, technician: e.target.value})}
+                  onChange={(e) => setSelectedLead({ ...selectedLead, technician: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
                 >
                   <option value="">Select Technician</option>
                   {technicians.map(tech => (
-                    <option key={tech} value={tech}>{tech}</option>
+                    <option key={tech} value={tech}>
+                      {tech}
+                    </option>
                   ))}
                 </select>
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Appointment Date</label>
                 <input
                   type="date"
                   value={selectedLead.appointmentDate || ''}
-                  onChange={(e) => setSelectedLead({...selectedLead, appointmentDate: e.target.value})}
+                  onChange={(e) => setSelectedLead({ ...selectedLead, appointmentDate: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
                 />
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Appointment Time</label>
                 <input
                   type="time"
-                  value={selectedLead.appointmentTime}
-                  onChange={(e) => setSelectedLead({...selectedLead, appointmentTime: e.target.value})}
+                  value={selectedLead.appointmentTime || ''}
+                  onChange={(e) => setSelectedLead({ ...selectedLead, appointmentTime: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
                 />
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
                 <textarea
-                  value={selectedLead.notes}
-                  onChange={(e) => setSelectedLead({...selectedLead, notes: e.target.value})}
+                  value={selectedLead.notes || ''}
+                  onChange={(e) => setSelectedLead({ ...selectedLead, notes: e.target.value })}
                   rows={3}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
                 />
               </div>
-              
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
                 <select
                   value={selectedLead.status}
-                  onChange={(e) => setSelectedLead({...selectedLead, status: e.target.value})}
+                  onChange={(e) => setSelectedLead({ ...selectedLead, status: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
                 >
                   {statusOptions.map(option => (
-                    <option key={option.value} value={option.value}>{option.label}</option>
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
                   ))}
                 </select>
               </div>
+
+              {/* Show OpenPhone link and Line name (read-only) if present */}
+              {(selectedLead.openphoneUrl || selectedLead.lineName) && (
+                <div className="pt-2 space-y-2 text-sm">
+                  {selectedLead.lineName && (
+                    <div>
+                      <span className="font-medium">Line: </span>
+                      <span>{selectedLead.lineName}</span>
+                    </div>
+                  )}
+                  {selectedLead.openphoneUrl && (
+                    <div>
+                      <a
+                        href={selectedLead.openphoneUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-blue-600 hover:text-blue-800"
+                      >
+                        <ExternalLink className="w-4 h-4" />
+                        Open conversation in OpenPhone
+                      </a>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
-            
+
             <div className="flex justify-end space-x-3 mt-6">
               <button
                 onClick={() => setSelectedLead(null)}
