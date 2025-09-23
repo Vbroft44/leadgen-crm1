@@ -124,6 +124,26 @@ const LeadGenCRM = () => {
     } catch (e) { console.error(e); }
     setSelectedLead(null);
   };
+// Soft-delete a lead (remove from UI and Supabase)
+const handleDeleteLead = async (leadId: number) => {
+  const ok = window.confirm('Delete this lead? (You can re-create it later)');
+  if (!ok) return;
+
+  // Keep a copy in case the API call fails
+  const previous = [...leads];
+
+  // Optimistic UI: remove it right away
+  setLeads(prev => prev.filter(l => l.id !== leadId));
+
+  try {
+    await deleteLead(leadId);
+  } catch (err) {
+    console.error(err);
+    // Restore if it failed
+    setLeads(previous);
+    alert('Delete failed. Please try again.');
+  }
+};
 
   // Add new lead
   const handleAddLead = async () => {
