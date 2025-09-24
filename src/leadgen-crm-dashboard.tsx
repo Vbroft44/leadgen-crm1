@@ -673,20 +673,20 @@ const LeadGenCRM = () => {
                 />
               </div>
 
+              {/* Technician */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Technician</label>
-                <select
-                  value={selectedLead.technician}
-                  onChange={(e) => setSelectedLead({ ...selectedLead, technician: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-                >
-                  <option value="">Select Technician</option>
-                  {technicians.map(tech => (
-                    <option key={tech} value={tech}>
-                      {tech}
-                    </option>
-                  ))}
-                </select>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Technician
+                </label>
+                <input
+                  type="text"
+                  value={selectedLead.technician || ''}
+                  onChange={(e) =>
+                      setSelectedLead({ ...selectedLead, technician: e.target.value })
+                }
+                placeholder="Type technician name"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                />
               </div>
 
               <div>
