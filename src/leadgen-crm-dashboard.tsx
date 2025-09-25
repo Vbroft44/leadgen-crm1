@@ -27,13 +27,7 @@ import {
   Trash2,
 } from "lucide-react";
 
-/** ──────────────────────────────────────────────────────────────────────────
- * Statuses (ordered, with Sold at the end)
- * value = stored in DB (leads.status)
- * label = shown in UI
- * color / textColor = chip styles
- * icon is not used on nav; left for future
- * ─────────────────────────────────────────────────────────────────────────── */
+/** Status list (Sold last) */
 const statusOptions = [
   { value: "new", label: "New Lead", color: "bg-blue-600", textColor: "text-white" },
 
@@ -83,7 +77,6 @@ const LeadGenCRM: React.FC = () => {
         serviceNeeded: d.service_needed,
         status: (d.status as StatusValue) || "new",
 
-        // prefer first contact if present
         dateAdded: new Date(d.first_contact_at || d.created_at),
         appointmentDate: d.appointment_date || "",
         appointmentTime: d.appointment_time || "",
@@ -91,7 +84,7 @@ const LeadGenCRM: React.FC = () => {
         notes: d.notes || "",
         lastUpdated: new Date(d.updated_at),
 
-        // line info
+        // Line & OpenPhone
         lineName: d.inbound_line_name || "",
         openphoneUrl: d.openphone_conversation_url || "",
       }));
@@ -112,8 +105,7 @@ const LeadGenCRM: React.FC = () => {
   const getStatusInfo = (status: string) => statusOptions.find((s) => s.value === status);
 
   const needsReminder = (lead: any) => {
-    // No reminder for canceled/sold
-    if (lead.status === "canceled" || lead.status === "sold" || lead.status === "canceled-no-tech") return false;
+    if (["canceled", "canceled-no-tech", "sold"].includes(lead.status)) return false;
     const hoursOld = (new Date().getTime() - new Date(lead.lastUpdated).getTime()) / (1000 * 60 * 60);
     return hoursOld > 2;
   };
@@ -205,17 +197,14 @@ const LeadGenCRM: React.FC = () => {
     const todayLeads = leads.filter((l) => new Date(l.dateAdded).toDateString() === today);
     return {
       totalToday: todayLeads.length,
-      bookedToday: todayLeads.filter((l) => l.status === "service-diagnostic-scheduled").length,
-      canceledToday: todayLeads.filter((l) => l.status === "canceled").length,
       soldToday: todayLeads.filter((l) => l.status === "sold").length,
+      canceledToday: todayLeads.filter((l) => l.status === "canceled").length,
       activeLeads: getActiveLeadsCount(),
     };
   };
   const analytics = getAnalytics();
 
-  /** ────────────────────────────────────────────────────────────────────────
-   * Lead Card (timestamp under the status, select width limited)
-   * ───────────────────────────────────────────────────────────────────────── */
+  /** Lead Card */
   const LeadCard = ({ lead }: { lead: any }) => {
     const statusInfo = getStatusInfo(lead.status);
     const hasRem = needsReminder(lead);
@@ -232,14 +221,38 @@ const LeadGenCRM: React.FC = () => {
           {/* Customer */}
           <div>
             <h3 className="font-semibold text-gray-900 text-lg">{lead.customerName || "—"}</h3>
+
             <div className="flex items-center space-x-1 text-sm text-gray-600">
               <Phone className="w-3 h-3" />
               <span>{lead.phone || "—"}</span>
             </div>
+
             {lead.email && (
               <div className="flex items-center space-x-1 text-sm text-gray-600">
                 <Mail className="w-3 h-3" />
                 <span>{lead.email}</span>
+              </div>
+            )}
+
+            {/* Line name + OpenPhone link */}
+            {lead.lineName && (
+              <div className="flex items-center text-sm text-gray-600">
+                <span className="font-medium text-gray-700">Line:</span>
+                <span className="ml-1 truncate" title={lead.lineName}>
+                  {lead.lineName}
+                </span>
+                {lead.openphoneUrl ? (
+                  <a
+                    href={lead.openphoneUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="ml-2 inline-flex items-center text-blue-600 hover:underline"
+                    title="Open conversation in OpenPhone"
+                  >
+                    <ExternalLink className="w-3 h-3 mr-1" />
+                    Open chat
+                  </a>
+                ) : null}
               </div>
             )}
           </div>
@@ -255,6 +268,16 @@ const LeadGenCRM: React.FC = () => {
             )}
           </div>
 
+          {/* Technician always (if present) */}
+          {lead.technician ? (
+            <div className="flex items-center text-sm text-gray-700">
+              <User className="w-3 h-3 mr-1" />
+              <span>
+                <span className="font-medium">Technician:</span> {lead.technician}
+              </span>
+            </div>
+          ) : null}
+
           {/* Appointment */}
           {lead.appointmentDate && (
             <div className="bg-green-50 p-2 rounded">
@@ -265,12 +288,6 @@ const LeadGenCRM: React.FC = () => {
                   {lead.appointmentTime ? ` at ${lead.appointmentTime}` : ""}
                 </span>
               </div>
-              {lead.technician && (
-                <div className="flex items-center space-x-1 text-sm text-green-800">
-                  <User className="w-3 h-3" />
-                  <span>{lead.technician}</span>
-                </div>
-              )}
             </div>
           )}
 
@@ -322,10 +339,9 @@ const LeadGenCRM: React.FC = () => {
     );
   };
 
-  // Sidebar nav items (single line; counts where helpful)
+  // Sidebar
   const navItems = [
     { id: "dashboard", label: "Dashboard", icon: Home },
-    // build from statusOptions to keep same order as the list
     ...statusOptions.map((s) => ({
       id: s.value,
       label: s.label,
@@ -424,7 +440,7 @@ const LeadGenCRM: React.FC = () => {
                     <div className="text-sm text-gray-600">Canceled Today</div>
                   </div>
                   <div className="bg-white p-4 rounded-lg shadow-sm border">
-                    <div className="text-2xl font-bold text-gray-600">{/* spacer */}0</div>
+                    <div className="text-2xl font-bold text-gray-600">0</div>
                     <div className="text-sm text-gray-600"> </div>
                   </div>
                   <div className="bg-white p-4 rounded-lg shadow-sm border">
@@ -453,7 +469,6 @@ const LeadGenCRM: React.FC = () => {
                   <h2 className="text-xl font-semibold text-gray-900">Analytics Dashboard</h2>
                 </div>
                 <div className="p-6">
-                  {/* Add charts later */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                     <div className="text-center">
                       <div className="text-3xl font-bold text-blue-600">{analytics.totalToday}</div>
@@ -476,7 +491,7 @@ const LeadGenCRM: React.FC = () => {
               </div>
             )}
 
-            {/* Status-specific views */}
+            {/* Status views */}
             {activeTab !== "dashboard" && activeTab !== "analytics" && (
               <div className="space-y-6">
                 <div className="flex items-center justify-between">
@@ -639,7 +654,7 @@ const LeadGenCRM: React.FC = () => {
                 />
               </div>
 
-              {/* Free text technician (not dropdown) */}
+              {/* Free text technician */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Technician</label>
                 <input
@@ -692,6 +707,22 @@ const LeadGenCRM: React.FC = () => {
                   ))}
                 </select>
               </div>
+
+              {/* Optional: show the OpenPhone link in the editor too */}
+              {selectedLead.openphoneUrl ? (
+                <div className="pt-2">
+                  <a
+                    href={selectedLead.openphoneUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-blue-600 hover:underline inline-flex items-center text-sm"
+                    title="Open conversation in OpenPhone"
+                  >
+                    <ExternalLink className="w-4 h-4 mr-1" />
+                    Open conversation in OpenPhone
+                  </a>
+                </div>
+              ) : null}
             </div>
 
             <div className="flex justify-end space-x-3 mt-6">
