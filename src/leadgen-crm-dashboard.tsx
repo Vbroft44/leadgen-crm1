@@ -29,9 +29,6 @@ import {
 
 /**
  * STATUS DEFS
- * - Keep "New Lead" first.
- * - The rest follow your requested flow.
- * - "Sold" is last.
  */
 type StatusValue =
   | 'new'
@@ -197,7 +194,7 @@ const LeadGenCRM: React.FC = () => {
     notes: '',
   });
 
-  // group / helpers
+  // helpers
   const getLeadsByStatus = (status: StatusValue) =>
     leads.filter(l => l.status === status);
 
@@ -326,7 +323,7 @@ const LeadGenCRM: React.FC = () => {
     };
   })();
 
-  // lead card
+  // Lead card
   const LeadCard: React.FC<{ lead: any }> = ({ lead }) => {
     const statusInfo = getStatusInfo(lead.status);
     const remind = needsReminder(lead);
@@ -435,7 +432,8 @@ const LeadGenCRM: React.FC = () => {
           <select
             value={lead.status}
             onChange={e => handleStatusChange(lead.id, e.target.value as StatusValue)}
-            className={`cursor-pointer rounded-full px-3 py-1 text-sm font-medium ${statusInfo.color} ${statusInfo.textColor} border-none`}
+            className={`w-40 max-w-full cursor-pointer rounded-full px-3 py-1 text-xs font-medium ${statusInfo.color} ${statusInfo.textColor} border-none`}
+            title={STATUS_META[lead.status].label}
           >
             {STATUS_ORDER.map(s => (
               <option key={s} value={s} className="text-gray-900">
@@ -468,7 +466,7 @@ const LeadGenCRM: React.FC = () => {
           ? CheckCircle
           : s === 'cancelled'
           ? XCircle
-          : Calendar, // generic for the rest
+          : Calendar,
       count: getLeadsByStatus(s).length,
     })),
     { id: 'analytics', label: 'Analytics', icon: BarChart3 },
@@ -523,13 +521,16 @@ const LeadGenCRM: React.FC = () => {
                             : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
                         }`}
                       >
-                        <span className="flex items-center gap-2">
-                          <Icon className="h-4 w-4" />
-                          {item.label}
+                        <span className="flex min-w-0 items-center gap-2">
+                          <Icon className="h-4 w-4 flex-shrink-0" />
+                          {/* single-line, clipped label */}
+                          <span className="truncate">
+                            {item.label}
+                          </span>
                         </span>
                         {'count' in item && item.count > 0 && (
                           <span
-                            className={`rounded-full px-2 py-1 text-xs ${
+                            className={`ml-2 shrink-0 rounded-full px-2 py-1 text-xs ${
                               active
                                 ? 'bg-blue-200 text-blue-800'
                                 : 'bg-gray-200 text-gray-700'
@@ -597,9 +598,7 @@ const LeadGenCRM: React.FC = () => {
             {activeTab === 'analytics' && (
               <div className="rounded-lg border bg-white shadow-sm">
                 <div className="border-b p-6">
-                  <h2 className="text-xl font-semibold text-gray-900">
-                    Analytics Dashboard
-                  </h2>
+                  <h2 className="text-xl font-semibold text-gray-900">Analytics Dashboard</h2>
                 </div>
 
                 <div className="space-y-8 p-6">
@@ -631,9 +630,7 @@ const LeadGenCRM: React.FC = () => {
                   </div>
 
                   <div>
-                    <h3 className="mb-4 text-lg font-medium text-gray-900">
-                      Pipeline Overview
-                    </h3>
+                    <h3 className="mb-4 text-lg font-medium text-gray-900">Pipeline Overview</h3>
                     <div className="space-y-3">
                       {STATUS_ORDER.map(s => {
                         const count = getLeadsByStatus(s).length;
@@ -643,7 +640,7 @@ const LeadGenCRM: React.FC = () => {
                             key={s}
                             className="flex items-center justify-between rounded bg-gray-50 p-3"
                           >
-                            <span className="font-medium">{meta.label}</span>
+                            <span className="truncate">{meta.label}</span>
                             <span
                               className={`rounded-full px-3 py-1 text-sm text-white ${meta.color}`}
                             >
@@ -662,7 +659,7 @@ const LeadGenCRM: React.FC = () => {
             {activeTab !== 'dashboard' && activeTab !== 'analytics' && (
               <div className="space-y-6">
                 <div className="flex items-center justify-between">
-                  <h2 className="text-2xl font-bold text-gray-900">
+                  <h2 className="truncate text-2xl font-bold text-gray-900">
                     {STATUS_META[activeTab as StatusValue]?.label || 'Leads'}
                   </h2>
                   <div className="text-sm text-gray-500">
@@ -681,12 +678,8 @@ const LeadGenCRM: React.FC = () => {
                     <div className="mb-4 text-gray-400">
                       <AlertCircle className="mx-auto h-12 w-12" />
                     </div>
-                    <h3 className="mb-2 text-lg font-medium text-gray-900">
-                      No leads found
-                    </h3>
-                    <p className="text-gray-500">
-                      There are no leads in this status yet.
-                    </p>
+                    <h3 className="mb-2 text-lg font-medium text-gray-900">No leads found</h3>
+                    <p className="text-gray-500">There are no leads in this status yet.</p>
                   </div>
                 )}
               </div>
@@ -699,9 +692,7 @@ const LeadGenCRM: React.FC = () => {
       {showAddLead && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <div className="w-full max-w-md rounded-lg bg-white p-6">
-            <h3 className="mb-4 text-lg font-semibold text-gray-900">
-              Add New Lead
-            </h3>
+            <h3 className="mb-4 text-lg font-semibold text-gray-900">Add New Lead</h3>
 
             <div className="space-y-4">
               <div>
@@ -871,7 +862,7 @@ const LeadGenCRM: React.FC = () => {
 
               <div>
                 <label className="mb-1 block text-sm font-medium text-gray-700">
-                Service Needed
+                  Service Needed
                 </label>
                 <input
                   type="text"
@@ -903,7 +894,7 @@ const LeadGenCRM: React.FC = () => {
                 />
               </div>
 
-              {/* Manual technician text input (per your last change) */}
+              {/* Manual technician text input */}
               <div>
                 <label className="mb-1 block text-sm font-medium text-gray-700">
                   Technician
