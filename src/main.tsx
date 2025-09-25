@@ -1,14 +1,20 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
+
+// IMPORTANT: keep your styles!
+import './index.css';
+
 import LeadGenCRM from './leadgen-crm-dashboard';
 import AdminPage from './AdminPage';
 
-const isAdminRoute = () => window.location.pathname.startsWith('/admin');
+// Use hash-based routing so we don't need server rewrites
+const isAdminRoute = () => window.location.hash.startsWith('#/admin');
 
-const rootEl = document.getElementById('root') as HTMLElement;
-const root = ReactDOM.createRoot(rootEl);
+const root = ReactDOM.createRoot(
+  document.getElementById('root') as HTMLElement
+);
 
-function renderApp() {
+function render() {
   root.render(
     <React.StrictMode>
       {isAdminRoute() ? <AdminPage /> : <LeadGenCRM />}
@@ -16,7 +22,8 @@ function renderApp() {
   );
 }
 
-renderApp();
+render();
 
-// Re-render if the URL path changes via back/forward
-window.addEventListener('popstate', renderApp);
+// Re-render when URL changes (back/forward or hash update)
+window.addEventListener('hashchange', render);
+window.addEventListener('popstate', render);
