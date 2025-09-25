@@ -6,7 +6,7 @@ const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-// Fetch leads (includes OpenPhone fields)
+// Only return non-deleted rows
 export async function fetchLeads() {
   const { data, error } = await supabase
     .from('leads')
@@ -27,15 +27,17 @@ export async function fetchLeads() {
       updated_at,
       first_contact_at,
       inbound_line_name,
-      openphone_conversation_url
+      openphone_conversation_url,
+      deleted_at
     `)
+    .is('deleted_at', null)          // ⬅️ ignore deleted rows
     .order('id', { ascending: false });
 
   if (error) throw error;
   return data || [];
 }
 
-// Add a lead (manual add from modal)
+// Manual add
 export async function addLead(payload: {
   customer_name: string;
   phone: string;
@@ -58,33 +60,26 @@ export async function addLead(payload: {
   return data!;
 }
 
-// Update a lead
+// Update
 export async function updateLead(id: number, updates: any) {
-  const { error } = await supabase
-    .from('leads')
-    .update(updates)
-    .eq('id', id);
-
+  const { error } = await supabase.from('leads').update(updates).eq('id', id);
   if (error) throw error;
 }
 
-// Delete a lead
+// SOFT delete (set deleted_at)
 export async function deleteLead(id: number) {
   const { error } = await supabase
     .from('leads')
-    .delete()
+    .update({ deleted_at: new Date().toISOString() }) // ⬅️ soft delete
     .eq('id', id);
-
   if (error) throw error;
 }
 
-// Technicians list (unchanged)
+// Technicians
 export async function fetchTechnicians() {
   const { data, error } = await supabase
     .from('technicians')
     .select('name, trade')
-    .order('name', { ascending: true });
-
   if (error) throw error;
   return data || [];
 }
