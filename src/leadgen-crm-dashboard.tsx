@@ -20,118 +20,127 @@ import {
   Trash2,
 } from "lucide-react";
 
-// Your existing data helpers (unchanged)
 import {
   fetchLeads,
   addLead,
   updateLead,
-  fetchTechnicians,
   deleteLead,
+  fetchTechnicians,
 } from "./data";
 
-/* ------------------------------------------------------------
-   Status options (unchanged from your working version)
-------------------------------------------------------------- */
-const STATUS_OPTIONS = [
-  { value: "new", label: "New Lead", color: "bg-blue-600", textColor: "text-white" },
-
-  { value: "waiting-more-details", label: "Waiting for More Details from Customer", color: "bg-amber-600", textColor: "text-white" },
-  { value: "waiting-new-tech", label: "Waiting for New Tech", color: "bg-amber-600", textColor: "text-white" },
-  { value: "waiting-customer-response", label: "Waiting for customer response", color: "bg-yellow-600", textColor: "text-white" },
-  { value: "quote-sent", label: "Quote Sent / Waiting for customer Response", color: "bg-sky-700", textColor: "text-white" },
-
-  { value: "rescheduled", label: "Reschedule", color: "bg-purple-600", textColor: "text-white" },
-  { value: "free-estimate-scheduled", label: "Free Estimate Scheduled", color: "bg-emerald-600", textColor: "text-white" },
-  { value: "service-diagnostic-scheduled", label: "Service / Diagnostic Call Scheduled", color: "bg-emerald-700", textColor: "text-white" },
-  { value: "visiting-charges-scheduled", label: "Visiting Charges Scheduled", color: "bg-green-700", textColor: "text-white" },
-  { value: "in-progress", label: "In Progress", color: "bg-indigo-600", textColor: "text-white" },
-
-  { value: "follow-up", label: "Follow Up with customer", color: "bg-violet-600", textColor: "text-white" },
-  { value: "job-too-small", label: "Job Too Small", color: "bg-gray-600", textColor: "text-white" },
-  { value: "too-expensive", label: "Too expensive for customer", color: "bg-zinc-700", textColor: "text-white" },
-  { value: "cancelled-no-tech", label: "Cancelled due to no tech available / show up", color: "bg-rose-700", textColor: "text-white" },
-  { value: "cancelled", label: "Cancelled", color: "bg-red-600", textColor: "text-white" },
-
-  { value: "sold", label: "Sold", color: "bg-teal-700", textColor: "text-white" },
-] as const;
-
-type StatusValue = (typeof STATUS_OPTIONS)[number]["value"];
-
-const TERMINAL_STATUSES: StatusValue[] = [
-  "cancelled",
-  "sold",
-  "too-expensive",
-  "job-too-small",
-  "cancelled-no-tech",
-];
-
-/* ------------------------------------------------------------
-   Types (UI shape)
-------------------------------------------------------------- */
-type UiLead = {
+/* ------------------------------------------------------------------ */
+/* Types                                                               */
+/* ------------------------------------------------------------------ */
+type Lead = {
   id: number;
   customerName: string;
   phone: string;
   email: string;
   address: string;
   serviceNeeded: string;
-  status: StatusValue;
-  dateAdded: Date;
+  status: string;
+
   appointmentDate: string | null;
   appointmentTime: string;
+
   technician: string;
   notes: string;
+
+  dateAdded: Date;
   lastUpdated: Date;
-  lineName: string;
-  openphoneUrl: string;
+
+  lineName: string; // inbound line name from OpenPhone
+  openphoneUrl: string; // link to OpenPhone conversation
 };
 
-/* ------------------------------------------------------------
-   Utils
-------------------------------------------------------------- */
-const fmtDate = (d: Date) =>
-  d.toLocaleDateString(undefined, { month: "numeric", day: "numeric", year: "numeric" });
+/* ------------------------------------------------------------------ */
+/* Statuses (ordered chronologically, “Sold” last)                     */
+/* ------------------------------------------------------------------ */
+const STATUS_OPTIONS = [
+  { value: "new", label: "New Lead" },
 
-const sameDay = (a: Date, b: Date) =>
-  a.getFullYear() === b.getFullYear() &&
-  a.getMonth() === b.getMonth() &&
-  a.getDate() === b.getDate();
+  { value: "waiting-more-details", label: "Waiting for More Details from Customer" },
+  { value: "waiting-new-tech", label: "Waiting for New Tech" },
+  { value: "waiting-customer-response", label: "Waiting for customer response" },
+  { value: "quote-sent", label: "Quote Sent / Waiting for customer Response" },
 
-const today = () => new Date();
+  { value: "reschedule", label: "Reschedule" },
+  { value: "free-estimate-scheduled", label: "Free Estimate Scheduled" },
+  { value: "service-diagnostic-scheduled", label: "Service / Diagnostic Call Scheduled" },
+  { value: "visiting-charges-scheduled", label: "Visiting Charges Scheduled" },
+  { value: "in-progress", label: "In Progress" },
 
-/* ------------------------------------------------------------
-   Component
-------------------------------------------------------------- */
+  { value: "follow-up", label: "Follow Up with customer" },
+  { value: "job-too-small", label: "Job Too Small" },
+  { value: "no-tech-available", label: "Cancelled: no tech available / show up" },
+  { value: "too-expensive", label: "Too expensive for customer" },
+  { value: "canceled", label: "Cancelled" },
+
+  { value: "sold", label: "Sold" },
+] as const;
+
+const STATUS_COLORS: Record<string, string> = {
+  "new": "bg-blue-600 text-white",
+  "waiting-more-details": "bg-yellow-500 text-white",
+  "waiting-new-tech": "bg-orange-500 text-white",
+  "waiting-customer-response": "bg-amber-500 text-white",
+  "quote-sent": "bg-indigo-500 text-white",
+
+  "reschedule": "bg-purple-500 text-white",
+  "free-estimate-scheduled": "bg-teal-600 text-white",
+  "service-diagnostic-scheduled": "bg-emerald-600 text-white",
+  "visiting-charges-scheduled": "bg-cyan-600 text-white",
+  "in-progress": "bg-sky-600 text-white",
+
+  "follow-up": "bg-fuchsia-600 text-white",
+  "job-too-small": "bg-gray-500 text-white",
+  "no-tech-available": "bg-stone-600 text-white",
+  "too-expensive": "bg-zinc-600 text-white",
+  "canceled": "bg-red-600 text-white",
+
+  "sold": "bg-green-600 text-white",
+};
+
+/* ------------------------------------------------------------------ */
+/* Component                                                           */
+/* ------------------------------------------------------------------ */
 const LeadGenCRM: React.FC = () => {
   const [activeTab, setActiveTab] = useState<string>("dashboard");
   const [showAddLead, setShowAddLead] = useState(false);
-  const [selectedLead, setSelectedLead] = useState<UiLead | null>(null);
+  const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
 
   const [technicians, setTechnicians] = useState<string[]>([]);
-  const [leads, setLeads] = useState<UiLead[]>([]);
+  const [leads, setLeads] = useState<Lead[]>([]);
 
-  /* -------------------- Fetch bootstrap data -------------------- */
+  /* ------------------------- Fetch initial data ------------------------- */
   useEffect(() => {
     (async () => {
-      const techs = await fetchTechnicians();
-      setTechnicians(techs.map((t: any) => `${t.name} - ${t.trade}`));
-
+      try {
+        const techs = await fetchTechnicians().catch(() => []);
+        if (Array.isArray(techs)) {
+          setTechnicians(techs.map((t: any) => `${t.name} - ${t.trade}`));
+        }
+      } catch {}
       const data = await fetchLeads();
 
-      const mapped: UiLead[] = data.map((d: any) => ({
+      const mapped: Lead[] = data.map((d: any) => ({
         id: d.id,
         customerName: d.customer_name || "",
         phone: d.phone || d.phone_e164 || "",
         email: d.email || "",
         address: d.address || "",
         serviceNeeded: d.service_needed || "",
-        status: (d.status || "new") as StatusValue,
+        status: d.status || "new",
+
         dateAdded: new Date(d.first_contact_at || d.created_at),
+        lastUpdated: new Date(d.updated_at),
+
         appointmentDate: d.appointment_date || null,
         appointmentTime: d.appointment_time || "",
+
         technician: d.technician || "",
         notes: d.notes || "",
-        lastUpdated: new Date(d.updated_at),
+
         lineName: d.inbound_line_name || "",
         openphoneUrl: d.openphone_conversation_url || "",
       }));
@@ -140,22 +149,48 @@ const LeadGenCRM: React.FC = () => {
     })();
   }, []);
 
-  /* -------------------- Derived helpers -------------------- */
-  const getLeadsByStatus = (status: StatusValue) =>
-    leads.filter((l) => l.status === status);
+  /* ------------------------------ New lead ------------------------------ */
+  const [newLead, setNewLead] = useState({
+    customerName: "",
+    phone: "",
+    email: "",
+    address: "",
+    serviceNeeded: "",
+    technician: "",
+    notes: "",
+  });
 
-  const needsReminder = (lead: UiLead) => {
-    if (TERMINAL_STATUSES.includes(lead.status)) return false;
-    const hours = (Date.now() - lead.lastUpdated.getTime()) / 36e5;
-    return hours > 2;
+  /* ------------------------------ Helpers ------------------------------- */
+  const needsReminder = (lead: Lead) => {
+    if (lead.status === "canceled" || lead.status === "sold") return false;
+    const hoursOld =
+      (Date.now() - new Date(lead.lastUpdated).getTime()) / (1000 * 60 * 60);
+    return hoursOld > 2;
   };
 
-  const getStatusInfo = (status: StatusValue) =>
-    STATUS_OPTIONS.find((s) => s.value === status)!;
+  const getLeadsByStatus = (status: string) =>
+    leads.filter((l) => l.status === status);
 
-  const handleStatusChange = async (leadId: number, newStatus: StatusValue) => {
+  const analytics = useMemo(() => {
+    const todayStr = new Date().toDateString();
+    const todayLeads = leads.filter(
+      (l) => new Date(l.dateAdded).toDateString() === todayStr
+    );
+    return {
+      totalToday: todayLeads.length,
+      soldToday: todayLeads.filter((l) => l.status === "sold").length,
+      canceledToday: todayLeads.filter((l) => l.status === "canceled").length,
+      activeLeads: leads.filter(
+        (l) => !["sold", "canceled"].includes(l.status)
+      ).length,
+    };
+  }, [leads]);
+
+  const handleStatusChange = async (leadId: number, newStatus: string) => {
     setLeads((prev) =>
-      prev.map((l) => (l.id === leadId ? { ...l, status: newStatus, lastUpdated: new Date() } : l))
+      prev.map((l) =>
+        l.id === leadId ? { ...l, status: newStatus, lastUpdated: new Date() } : l
+      )
     );
     try {
       await updateLead(leadId, { status: newStatus });
@@ -164,9 +199,11 @@ const LeadGenCRM: React.FC = () => {
     }
   };
 
-  const handleLeadUpdate = async (leadId: number, updates: Partial<UiLead>) => {
+  const handleLeadUpdate = async (leadId: number, updates: Partial<Lead>) => {
     setLeads((prev) =>
-      prev.map((l) => (l.id === leadId ? { ...l, ...updates, lastUpdated: new Date() } : l))
+      prev.map((l) =>
+        l.id === leadId ? { ...l, ...updates, lastUpdated: new Date() } : l
+      )
     );
     try {
       await updateLead(leadId, {
@@ -191,325 +228,328 @@ const LeadGenCRM: React.FC = () => {
     const ok = window.confirm("Delete this lead?");
     if (!ok) return;
 
-    const previous = [...leads];
+    const copy = [...leads];
     setLeads((prev) => prev.filter((l) => l.id !== leadId));
+
     try {
       await deleteLead(leadId);
     } catch (e) {
       console.error(e);
-      setLeads(previous);
+      setLeads(copy);
       alert("Delete failed. Please try again.");
     }
   };
 
-  const [newLead, setNewLead] = useState({
-    customerName: "",
-    phone: "",
-    email: "",
-    address: "",
-    serviceNeeded: "",
-    notes: "",
-  });
-
   const handleAddLead = async () => {
-    if (!newLead.customerName || !newLead.phone || !newLead.serviceNeeded) return;
-    const draft: UiLead = {
-      id: -1,
+    if (!newLead.customerName || !newLead.phone || !newLead.serviceNeeded) {
+      alert("Name, Phone and Service Needed are required.");
+      return;
+    }
+    const draft: Partial<Lead> = {
       customerName: newLead.customerName,
       phone: newLead.phone,
-      email: newLead.email || "",
-      address: newLead.address || "",
+      email: newLead.email,
+      address: newLead.address,
       serviceNeeded: newLead.serviceNeeded,
+      technician: newLead.technician,
+      notes: newLead.notes,
       status: "new",
       dateAdded: new Date(),
       lastUpdated: new Date(),
       appointmentDate: null,
       appointmentTime: "",
-      technician: "",
-      notes: newLead.notes || "",
       lineName: "",
       openphoneUrl: "",
     };
+
     try {
       const created = await addLead({
-        customer_name: newLead.customerName,
-        phone: newLead.phone,
-        email: newLead.email || null,
-        address: newLead.address || null,
-        service_needed: newLead.serviceNeeded,
+        customer_name: draft.customerName,
+        phone: draft.phone,
+        email: draft.email || null,
+        address: draft.address || null,
+        service_needed: draft.serviceNeeded,
         status: "new",
         appointment_date: null,
         appointment_time: null,
-        technician: null,
-        notes: newLead.notes || null,
+        technician: draft.technician || null,
+        notes: draft.notes || null,
       });
-      draft.id = created.id;
-      setLeads((prev) => [draft, ...prev]);
+
+      const full: Lead = {
+        ...(draft as Lead),
+        id: created.id,
+      };
+
+      setLeads((prev) => [full, ...prev]);
       setShowAddLead(false);
-      setNewLead({ customerName: "", phone: "", email: "", address: "", serviceNeeded: "", notes: "" });
+      setNewLead({
+        customerName: "",
+        phone: "",
+        email: "",
+        address: "",
+        serviceNeeded: "",
+        technician: "",
+        notes: "",
+      });
     } catch (e) {
       console.error(e);
     }
   };
 
-  /* -------------------- Analytics (memoized) -------------------- */
-  const analytics = useMemo(() => {
-    const now = today();
+  /* ------------------------------------------------------------------ */
+  /* UI Components                                                      */
+  /* ------------------------------------------------------------------ */
 
-    // last 14 days buckets
-    const N = 14;
-    const buckets: { key: string; label: string; date: Date; count: number }[] = [];
-    for (let i = N - 1; i >= 0; i--) {
-      const d = new Date(now);
-      d.setDate(now.getDate() - i);
-      const label = d.toLocaleDateString(undefined, { month: "numeric", day: "numeric" });
-      const key = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
-      buckets.push({ key, label, date: d, count: 0 });
-    }
-    leads.forEach((l) => {
-      for (const b of buckets) {
-        if (sameDay(l.dateAdded, b.date)) {
-          b.count++;
-          break;
-        }
-      }
-    });
-
-    const leadsLast14 = buckets.reduce((a, b) => a + b.count, 0);
-
-    // pipeline = not terminal
-    const inPipeline = leads.filter((l) => !TERMINAL_STATUSES.includes(l.status)).length;
-
-    // by line
-    const perLine: Record<string, number> = {};
-    for (const l of leads) {
-      const key = l.lineName?.trim() || "(no line)";
-      perLine[key] = (perLine[key] ?? 0) + 1;
-    }
-    const perLineArr = Object.entries(perLine)
-      .map(([line, count]) => ({ line, count }))
-      .sort((a, b) => b.count - a.count);
-
-    const uniqueLines = perLineArr.filter((x) => x.line !== "(no line)").length;
-
-    return {
-      last14Bars: buckets,
-      leadsLast14,
-      inPipeline,
-      perLineArr,
-      uniqueLines,
-      totalLeads: leads.length,
-    };
-  }, [leads]);
-
-  /* -------------------- Lead Card -------------------- */
-  const LeadCard: React.FC<{ lead: UiLead }> = ({ lead }) => {
-    const statusInfo = getStatusInfo(lead.status);
-    const reminder = needsReminder(lead);
-
+  const StatusPill: React.FC<{ status: string; leadId: number }> = ({
+    status,
+    leadId,
+  }) => {
+    const color = STATUS_COLORS[status] ?? "bg-blue-600 text-white";
     return (
-      <div className="relative bg-white rounded-xl border border-gray-200 shadow-sm p-4 hover:shadow transition">
-        {/* bell */}
-        {reminder && (
-          <div className="absolute top-3 left-3">
+      <select
+        value={status}
+        onChange={(e) => handleStatusChange(leadId, e.target.value)}
+        className={`w-40 px-3 py-2 rounded-full text-sm font-medium border-none ${color} cursor-pointer focus:outline-none`}
+      >
+        {STATUS_OPTIONS.map((opt) => (
+          <option key={opt.value} value={opt.value} className="text-gray-900">
+            {opt.label}
+          </option>
+        ))}
+      </select>
+    );
+  };
+
+  const LeadCard: React.FC<{ lead: Lead }> = ({ lead }) => {
+    const hasReminder = needsReminder(lead);
+    return (
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 hover:shadow-md transition relative">
+        {/* Reminder bell */}
+        {hasReminder && (
+          <div className="absolute top-2 right-2">
             <Bell className="w-4 h-4 text-red-500 animate-pulse" />
           </div>
         )}
 
-        {/* Top content */}
-        <div className="pr-24 space-y-3">
-          {/* Name */}
-          {!!lead.customerName && (
-            <h3 className="text-base font-semibold text-gray-900">{lead.customerName}</h3>
+        <div className="space-y-3">
+          {/* 1) Customer Name */}
+          {lead.customerName && (
+            <h3 className="text-base font-semibold text-gray-900 break-words">
+              {lead.customerName}
+            </h3>
           )}
 
-          {/* Phone */}
-          <div className="flex items-center gap-2 text-sm text-gray-700">
-            <Phone className="w-4 h-4 text-gray-400" />
-            <span className="font-medium">{lead.phone || "—"}</span>
+          {/* 2) Phone + line name (no action icons here anymore) */}
+          <div className="text-sm text-gray-700 space-y-1 min-w-0">
+            {/* Phone */}
+            <div className="flex items-center gap-2">
+              <Phone className="w-4 h-4 text-gray-500" />
+              <span className="font-medium">{lead.phone || "—"}</span>
+            </div>
+
+            {/* Line name */}
+            {lead.lineName && (
+              <div className="flex items-start gap-2">
+                <span className="text-gray-500 shrink-0">Line:</span>
+                <span className="font-medium truncate block max-w-full">
+                  {lead.lineName}
+                </span>
+              </div>
+            )}
           </div>
 
-          {/* Line + Open chat small icon just after title row (but we keep the bottom icon too) */}
-          {lead.lineName && (
-            <div className="flex items-center gap-2 text-sm text-gray-700">
-              <span className="text-gray-500">Line:</span>
-              <span className="font-semibold truncate">{lead.lineName}</span>
-            </div>
-          )}
-
-          {/* Service */}
+          {/* 3) Service Needed */}
           {lead.serviceNeeded && (
-            <div className="text-sm">
-              <span className="text-gray-500">Service Needed: </span>
-              <span className="font-medium text-gray-800">{lead.serviceNeeded}</span>
-            </div>
+            <p className="text-sm text-gray-900">
+              <span className="font-semibold">Service Needed:</span>{" "}
+              <span className="break-words">{lead.serviceNeeded}</span>
+            </p>
           )}
 
-          {/* Address */}
+          {/* 4) Address */}
           {lead.address && (
             <div className="flex items-start gap-2 text-sm text-gray-700">
-              <MapPin className="w-4 h-4 mt-0.5 text-gray-400 flex-none" />
-              <span className="leading-snug">{lead.address}</span>
+              <MapPin className="w-4 h-4 mt-0.5 text-gray-500 shrink-0" />
+              <span className="break-words">{lead.address}</span>
             </div>
           )}
 
-          {/* Technician */}
+          {/* 5) Technician */}
           {lead.technician && (
-            <div className="text-sm">
-              <span className="text-gray-500">Technician: </span>
-              <span className="font-medium text-gray-800">{lead.technician}</span>
+            <p className="text-sm text-gray-700">
+              <span className="font-semibold">Technician:</span>{" "}
+              <span className="break-words">{lead.technician}</span>
+            </p>
+          )}
+
+          {/* 6) Appointment */}
+          {(lead.appointmentDate || lead.appointmentTime) && (
+            <div className="bg-green-50 border border-green-100 rounded p-2 text-sm text-green-900 space-y-1">
+              <div className="flex items-center gap-2">
+                <Calendar className="w-4 h-4" />
+                <span>
+                  {lead.appointmentDate || "—"}
+                  {lead.appointmentTime ? ` at ${lead.appointmentTime}` : ""}
+                </span>
+              </div>
             </div>
           )}
 
-          {/* Appointment */}
-          {!!lead.appointmentDate && (
-            <div className="bg-emerald-50 text-emerald-800 text-sm rounded-md px-3 py-2 inline-flex items-center gap-2">
-              <Calendar className="w-4 h-4" />
-              <span>
-                {lead.appointmentDate} {lead.appointmentTime ? `at ${lead.appointmentTime}` : ""}
-              </span>
-            </div>
-          )}
-
-          {/* Notes */}
-          {!!lead.notes && (
-            <div className="text-sm text-gray-700 bg-gray-50 rounded-md px-3 py-2">
+          {/* 7) Notes */}
+          {lead.notes && (
+            <p className="text-sm text-gray-700 bg-gray-50 border border-gray-100 rounded p-2">
               {lead.notes}
-            </div>
+            </p>
           )}
 
-          {/* Status + timestamp */}
-          <div className="mt-1 flex items-center gap-3">
-            <select
-              value={lead.status}
-              onChange={(e) => handleStatusChange(lead.id, e.target.value as StatusValue)}
-              className={`w-44 px-3 py-2 rounded-full text-sm font-medium border-0 ${statusInfo.color} ${statusInfo.textColor} cursor-pointer`}
-            >
-              {STATUS_OPTIONS.map((s) => (
-                <option key={s.value} value={s.value} className="text-gray-900">
-                  {s.label}
-                </option>
-              ))}
-            </select>
+          {/* 8) Status */}
+          <div className="pt-1">
+            <StatusPill status={lead.status} leadId={lead.id} />
+          </div>
 
-            <div className="text-xs text-gray-500 flex items-center gap-1">
-              <Clock className="w-3.5 h-3.5" />
-              <span>Added {lead.dateAdded.toLocaleString()}</span>
+          {/* 9) Footer row: timestamp left, actions right */}
+          <div className="pt-1 flex items-center justify-between">
+            <div className="text-xs text-gray-400 flex items-center gap-1">
+              <Clock className="w-3 h-3" />
+              <span>Added {new Date(lead.dateAdded).toLocaleString()}</span>
+            </div>
+
+            <div className="shrink-0 flex items-center gap-2">
+              {lead.openphoneUrl ? (
+                <a
+                  href={lead.openphoneUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  title="Open chat in OpenPhone"
+                  className="p-1.5 rounded hover:bg-gray-100"
+                >
+                  <ExternalLink className="w-4 h-4 text-blue-600" />
+                </a>
+              ) : null}
+
+              <button
+                onClick={() => setSelectedLead(lead)}
+                title="Edit"
+                className="p-1.5 rounded hover:bg-gray-100 text-gray-500 hover:text-blue-600"
+              >
+                <Edit3 className="w-4 h-4" />
+              </button>
+
+              <button
+                onClick={() => handleDeleteLead(lead.id)}
+                title="Delete"
+                className="p-1.5 rounded hover:bg-gray-100 text-gray-500 hover:text-red-600"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
             </div>
           </div>
-        </div>
-
-        {/* Bottom-right icon cluster */}
-        <div className="absolute bottom-3 right-3 flex items-center gap-4">
-          {lead.openphoneUrl && (
-            <a
-              href={lead.openphoneUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-blue-600 hover:text-blue-800"
-              title="Open chat in OpenPhone"
-            >
-              <ExternalLink className="w-5 h-5" />
-            </a>
-          )}
-          <button
-            onClick={() => setSelectedLead(lead)}
-            className="text-gray-500 hover:text-blue-600"
-            title="Edit lead"
-          >
-            <Edit3 className="w-5 h-5" />
-          </button>
-          <button
-            onClick={() => handleDeleteLead(lead.id)}
-            className="text-gray-500 hover:text-red-600"
-            title="Delete lead"
-          >
-            <Trash2 className="w-5 h-5" />
-          </button>
         </div>
       </div>
     );
   };
 
-  /* -------------------- Sidebar nav -------------------- */
+  /* ------------------------------- Nav list ------------------------------ */
+  const getLeadsBy = (id: string) => getLeadsByStatus(id).length;
+
   const navItems = [
     { id: "dashboard", label: "Dashboard", icon: Home },
-    { id: "new", label: "New Lead", icon: AlertCircle, count: getLeadsByStatus("new").length },
+    { id: "new", label: "New Lead", icon: AlertCircle, count: getLeadsBy("new") },
 
-    { id: "waiting-more-details", label: "Waiting for More Details ...", icon: Phone, count: getLeadsByStatus("waiting-more-details").length },
-    { id: "waiting-new-tech", label: "Waiting for New Tech", icon: Users, count: getLeadsByStatus("waiting-new-tech").length },
-    { id: "waiting-customer-response", label: "Waiting for customer res...", icon: Users, count: getLeadsByStatus("waiting-customer-response").length },
-    { id: "quote-sent", label: "Quote Sent / Waiting ...", icon: Users, count: getLeadsByStatus("quote-sent").length },
+    { id: "waiting-more-details", label: "Waiting for More Details …", icon: Phone, count: getLeadsBy("waiting-more-details") },
+    { id: "waiting-new-tech", label: "Waiting for New Tech", icon: Users, count: getLeadsBy("waiting-new-tech") },
+    { id: "waiting-customer-response", label: "Waiting for customer res…", icon: Mail, count: getLeadsBy("waiting-customer-response") },
+    { id: "quote-sent", label: "Quote Sent / Waiting …", icon: Mail, count: getLeadsBy("quote-sent") },
 
-    { id: "free-estimate-scheduled", label: "Free Estimate Scheduled", icon: Calendar, count: getLeadsByStatus("free-estimate-scheduled").length },
-    { id: "service-diagnostic-scheduled", label: "Service / Diagnostic Call ...", icon: Calendar, count: getLeadsByStatus("service-diagnostic-scheduled").length },
-    { id: "visiting-charges-scheduled", label: "Visiting Charges Scheduled", icon: Calendar, count: getLeadsByStatus("visiting-charges-scheduled").length },
-    { id: "in-progress", label: "In Progress", icon: RotateCcw, count: getLeadsByStatus("in-progress").length },
-    { id: "follow-up", label: "Follow Up with customer", icon: CheckCircle, count: getLeadsByStatus("follow-up").length },
+    { id: "reschedule", label: "Reschedule", icon: RotateCcw, count: getLeadsBy("reschedule") },
+    { id: "free-estimate-scheduled", label: "Free Estimate Scheduled", icon: Calendar, count: getLeadsBy("free-estimate-scheduled") },
+    { id: "service-diagnostic-scheduled", label: "Service / Diagnostic Call …", icon: Calendar, count: getLeadsBy("service-diagnostic-scheduled") },
+    { id: "visiting-charges-scheduled", label: "Visiting Charges Scheduled", icon: Calendar, count: getLeadsBy("visiting-charges-scheduled") },
+    { id: "in-progress", label: "In Progress", icon: Users, count: getLeadsBy("in-progress") },
 
-    { id: "job-too-small", label: "Job Too Small", icon: XCircle, count: getLeadsByStatus("job-too-small").length },
-    { id: "too-expensive", label: "Too expensive for custom...", icon: XCircle, count: getLeadsByStatus("too-expensive").length },
-    { id: "cancelled-no-tech", label: "Cancelled: no tech avail ...", icon: XCircle, count: getLeadsByStatus("cancelled-no-tech").length },
-    { id: "cancelled", label: "Cancelled", icon: XCircle, count: getLeadsByStatus("cancelled").length },
+    { id: "follow-up", label: "Follow Up with customer", icon: Phone, count: getLeadsBy("follow-up") },
+    { id: "job-too-small", label: "Job Too Small", icon: XCircle, count: getLeadsBy("job-too-small") },
+    { id: "no-tech-available", label: "Cancelled: no tech avail …", icon: XCircle, count: getLeadsBy("no-tech-available") },
+    { id: "too-expensive", label: "Too expensive for custom…", icon: XCircle, count: getLeadsBy("too-expensive") },
+    { id: "canceled", label: "Cancelled", icon: XCircle, count: getLeadsBy("canceled") },
 
-    { id: "sold", label: "Sold", icon: CheckCircle, count: getLeadsByStatus("sold").length },
+    { id: "sold", label: "Sold", icon: CheckCircle, count: getLeadsBy("sold") },
 
     { id: "analytics", label: "Analytics", icon: BarChart3 },
   ];
 
-  /* -------------------- Layout -------------------- */
+  /* ------------------------------------------------------------------ */
+  /* Render                                                             */
+  /* ------------------------------------------------------------------ */
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <header className="bg-white border-b shadow-sm">
+      <header className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between py-4">
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center">
+          <div className="flex justify-between items-center py-4">
+            <div className="flex items-center space-x-3">
+              <div className="w-8 h-8 bg-blue-600 rounded-lg flex items-center justify-center">
                 <Phone className="w-5 h-5 text-white" />
               </div>
-              <h1 className="text-xl font-bold text-gray-900">Lead Generation CRM</h1>
+              <h1 className="text-xl font-bold text-gray-900">
+                Lead Generation CRM
+              </h1>
             </div>
 
-            <button
-              onClick={() => setShowAddLead(true)}
-              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2"
-            >
-              <Plus className="w-4 h-4" />
-              Add Lead
-            </button>
+            <div className="flex items-center space-x-4">
+              <div className="flex items-center space-x-2 text-sm text-gray-600">
+                <Bell className="w-4 h-4" />
+                <span>{leads.filter(needsReminder).length} reminders</span>
+              </div>
+
+              <button
+                onClick={() => setShowAddLead(true)}
+                className="bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center space-x-2 hover:bg-blue-700 transition-colors"
+              >
+                <Plus className="w-4 h-4" />
+                <span>Add Lead</span>
+              </button>
+            </div>
           </div>
         </div>
       </header>
 
+      {/* Body */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <div className="flex gap-6">
           {/* Sidebar */}
-          <aside className="w-64 flex-shrink-0">
-            <nav className="bg-white border rounded-lg shadow-sm p-4">
+          <aside className="w-64 shrink-0">
+            <nav className="bg-white rounded-lg shadow-sm border p-4">
               <ul className="space-y-2">
-                {navItems.map((n) => {
-                  const Icon = n.icon;
-                  const active = activeTab === n.id;
+                {navItems.map((item) => {
+                  const Icon = item.icon;
                   return (
-                    <li key={n.id}>
+                    <li key={item.id}>
                       <button
-                        onClick={() => setActiveTab(n.id)}
-                        className={`w-full flex items-center justify-between px-3 py-2 rounded-md text-sm ${
-                          active ? "bg-blue-50 text-blue-700" : "text-gray-700 hover:bg-gray-50"
+                        onClick={() => setActiveTab(item.id)}
+                        className={`w-full flex items-center justify-between px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                          activeTab === item.id
+                            ? "bg-blue-50 text-blue-700 border border-blue-100"
+                            : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
                         }`}
                       >
-                        <span className="flex items-center gap-2">
+                        <div className="flex items-center gap-2">
                           <Icon className="w-4 h-4" />
-                          <span className="truncate">{n.label}</span>
-                        </span>
-                        {!!n.count && (
+                          <span className="truncate max-w-[180px] text-left">
+                            {item.label}
+                          </span>
+                        </div>
+
+                        {typeof item.count === "number" && item.count > 0 && (
                           <span
-                            className={`text-xs px-2 py-0.5 rounded-full ${
-                              active ? "bg-blue-200 text-blue-800" : "bg-gray-200 text-gray-700"
+                            className={`px-2 py-1 text-xs rounded-full ${
+                              activeTab === item.id
+                                ? "bg-blue-200 text-blue-800"
+                                : "bg-gray-200 text-gray-700"
                             }`}
                           >
-                            {n.count}
+                            {item.count}
                           </span>
                         )}
                       </button>
@@ -521,123 +561,82 @@ const LeadGenCRM: React.FC = () => {
           </aside>
 
           {/* Main */}
-          <main className="flex-1">
-            {/* Dashboard showing quick cards + recent leads */}
+          <main className="flex-1 space-y-6">
+            {/* Dashboard cards */}
             {activeTab === "dashboard" && (
-              <div className="space-y-6">
+              <>
                 <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
-                  <StatCard title="New Today" value={
-                    leads.filter((l) => sameDay(l.dateAdded, today())).length
-                  } />
-                  <StatCard title="Sold Today" value={
-                    leads.filter((l) => l.status === "sold" && sameDay(l.lastUpdated, today())).length
-                  } />
-                  <StatCard title="Canceled Today" value={
-                    leads.filter((l) => (l.status === "cancelled" || l.status === "cancelled-no-tech") && sameDay(l.lastUpdated, today())).length
-                  } />
-                  <StatCard title="Active Leads" value={
-                    leads.filter((l) => !TERMINAL_STATUSES.includes(l.status)).length
-                  } />
-                  <StatCard title="Total Leads" value={leads.length} />
+                  <div className="bg-white p-4 rounded-lg shadow-sm border">
+                    <div className="text-2xl font-bold text-blue-600">
+                      {analytics.totalToday}
+                    </div>
+                    <div className="text-sm text-gray-600">New Today</div>
+                  </div>
+                  <div className="bg-white p-4 rounded-lg shadow-sm border">
+                    <div className="text-2xl font-bold text-green-600">
+                      {analytics.soldToday}
+                    </div>
+                    <div className="text-sm text-gray-600">Sold Today</div>
+                  </div>
+                  <div className="bg-white p-4 rounded-lg shadow-sm border">
+                    <div className="text-2xl font-bold text-red-600">
+                      {analytics.canceledToday}
+                    </div>
+                    <div className="text-sm text-gray-600">Canceled Today</div>
+                  </div>
+                  <div className="bg-white p-4 rounded-lg shadow-sm border col-span-2">
+                    <div className="text-2xl font-bold text-orange-600">
+                      {analytics.activeLeads}
+                    </div>
+                    <div className="text-sm text-gray-600">Active Leads</div>
+                  </div>
                 </div>
 
-                <section className="bg-white border rounded-lg shadow-sm">
-                  <header className="border-b p-4">
-                    <h2 className="text-lg font-semibold text-gray-900">Recent Leads</h2>
-                  </header>
+                <section className="bg-white rounded-lg shadow-sm border">
+                  <div className="p-4 border-b">
+                    <h2 className="text-lg font-semibold text-gray-900">
+                      Recent Leads
+                    </h2>
+                  </div>
                   <div className="p-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {leads.slice(0, 6).map((l) => (
-                      <LeadCard key={l.id} lead={l} />
+                    {leads.slice(0, 6).map((lead) => (
+                      <LeadCard key={lead.id} lead={lead} />
                     ))}
                   </div>
                 </section>
-              </div>
+              </>
             )}
 
             {/* Status pages */}
             {activeTab !== "dashboard" && activeTab !== "analytics" && (
-              <section className="space-y-6">
+              <section className="space-y-4">
                 <div className="flex items-center justify-between">
                   <h2 className="text-2xl font-bold text-gray-900">
-                    {STATUS_OPTIONS.find((s) => s.value === activeTab)?.label || "Leads"}
+                    {STATUS_OPTIONS.find((s) => s.value === activeTab)?.label ??
+                      "Leads"}
                   </h2>
-                  <span className="text-sm text-gray-500">
-                    {getLeadsByStatus(activeTab as StatusValue).length} leads
-                  </span>
+                  <div className="text-sm text-gray-500">
+                    {getLeadsByStatus(activeTab).length} leads
+                  </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                  {getLeadsByStatus(activeTab as StatusValue).map((l) => (
-                    <LeadCard key={l.id} lead={l} />
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {getLeadsByStatus(activeTab).map((lead) => (
+                    <LeadCard key={lead.id} lead={lead} />
                   ))}
                 </div>
               </section>
             )}
 
-            {/* Analytics page */}
+            {/* Analytics stub */}
             {activeTab === "analytics" && (
-              <section className="space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                  <StatCard title="Leads (last 14 days)" value={analytics.leadsLast14} />
-                  <StatCard title="In Pipeline" value={analytics.inPipeline} />
-                  <StatCard title="Unique Lines" value={analytics.uniqueLines} />
-                  <StatCard title="Total Leads" value={analytics.totalLeads} />
-                </div>
-
-                {/* Skinny 14-day bar chart */}
-                <div className="bg-white border rounded-lg shadow-sm p-4">
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-lg font-semibold text-gray-900">Leads per day (last 14 days)</h3>
-                  </div>
-                  <div className="h-32 flex items-end gap-2">
-                    {analytics.last14Bars.map((b) => {
-                      const max = Math.max(1, ...analytics.last14Bars.map((x) => x.count));
-                      const hPct = (b.count / max) * 100;
-                      return (
-                        <div key={b.key} className="flex-1 flex flex-col items-center">
-                          <div
-                            className="w-full max-w-[18px] bg-blue-500 rounded-t"
-                            style={{ height: `${hPct}%` }}
-                            title={`${b.label}: ${b.count}`}
-                          />
-                          <div className="text-[10px] text-gray-500 mt-1">{b.label}</div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                {/* Calls per line (table) */}
-                <div className="bg-white border rounded-lg shadow-sm">
-                  <header className="border-b p-4">
-                    <h3 className="text-lg font-semibold text-gray-900">Calls per line</h3>
-                  </header>
-                  <div className="p-4 overflow-x-auto">
-                    <table className="min-w-full text-sm">
-                      <thead>
-                        <tr className="text-left text-gray-500">
-                          <th className="py-2 pr-4">Line</th>
-                          <th className="py-2 pr-4">Leads</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {analytics.perLineArr.map((row, idx) => (
-                          <tr key={idx} className="border-t">
-                            <td className="py-2 pr-4">{row.line}</td>
-                            <td className="py-2 pr-4 font-semibold">{row.count}</td>
-                          </tr>
-                        ))}
-                        {analytics.perLineArr.length === 0 && (
-                          <tr>
-                            <td colSpan={2} className="text-gray-500 py-6 text-center">
-                              No data yet.
-                            </td>
-                          </tr>
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
+              <section className="bg-white rounded-lg shadow-sm border p-6">
+                <h2 className="text-xl font-semibold text-gray-900 mb-4">
+                  Analytics
+                </h2>
+                <p className="text-gray-600">
+                  (Add charts here later if you’d like.)
+                </p>
               </section>
             )}
           </main>
@@ -648,45 +647,121 @@ const LeadGenCRM: React.FC = () => {
       {showAddLead && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-lg max-w-md w-full p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Add New Lead</h3>
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">
+              Add New Lead
+            </h3>
+
             <div className="space-y-4">
-              <LabeledInput
-                label="Customer Name *"
-                value={newLead.customerName}
-                onChange={(v) => setNewLead((p) => ({ ...p, customerName: v }))}
-              />
-              <LabeledInput
-                label="Phone *"
-                value={newLead.phone}
-                onChange={(v) => setNewLead((p) => ({ ...p, phone: v }))}
-              />
-              <LabeledInput
-                label="Email"
-                value={newLead.email}
-                onChange={(v) => setNewLead((p) => ({ ...p, email: v }))}
-              />
-              <LabeledInput
-                label="Service Needed *"
-                placeholder="e.g. HVAC Repair, Plumbing, Electrical"
-                value={newLead.serviceNeeded}
-                onChange={(v) => setNewLead((p) => ({ ...p, serviceNeeded: v }))}
-              />
-              <LabeledInput
-                label="Address"
-                value={newLead.address}
-                onChange={(v) => setNewLead((p) => ({ ...p, address: v }))}
-              />
-              <LabeledTextArea
-                label="Notes"
-                value={newLead.notes}
-                onChange={(v) => setNewLead((p) => ({ ...p, notes: v }))}
-              />
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Customer Name *
+                </label>
+                <input
+                  type="text"
+                  value={newLead.customerName}
+                  onChange={(e) =>
+                    setNewLead({ ...newLead, customerName: e.target.value })
+                  }
+                  className="w-full px-3 py-2 border rounded-md focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Phone *
+                </label>
+                <input
+                  type="tel"
+                  value={newLead.phone}
+                  onChange={(e) =>
+                    setNewLead({ ...newLead, phone: e.target.value })
+                  }
+                  className="w-full px-3 py-2 border rounded-md focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Email
+                </label>
+                <input
+                  type="email"
+                  value={newLead.email}
+                  onChange={(e) =>
+                    setNewLead({ ...newLead, email: e.target.value })
+                  }
+                  className="w-full px-3 py-2 border rounded-md focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Service Needed *
+                </label>
+                <input
+                  type="text"
+                  value={newLead.serviceNeeded}
+                  onChange={(e) =>
+                    setNewLead({ ...newLead, serviceNeeded: e.target.value })
+                  }
+                  className="w-full px-3 py-2 border rounded-md focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Address
+                </label>
+                <input
+                  type="text"
+                  value={newLead.address}
+                  onChange={(e) =>
+                    setNewLead({ ...newLead, address: e.target.value })
+                  }
+                  className="w-full px-3 py-2 border rounded-md focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Technician
+                </label>
+                <input
+                  type="text"
+                  value={newLead.technician}
+                  onChange={(e) =>
+                    setNewLead({ ...newLead, technician: e.target.value })
+                  }
+                  className="w-full px-3 py-2 border rounded-md focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Notes
+                </label>
+                <textarea
+                  value={newLead.notes}
+                  onChange={(e) =>
+                    setNewLead({ ...newLead, notes: e.target.value })
+                  }
+                  rows={3}
+                  className="w-full px-3 py-2 border rounded-md focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
             </div>
+
             <div className="flex justify-end gap-3 mt-6">
-              <button className="px-4 py-2 text-gray-700 border rounded-md" onClick={() => setShowAddLead(false)}>
+              <button
+                onClick={() => setShowAddLead(false)}
+                className="px-4 py-2 text-gray-700 border rounded-md hover:bg-gray-50"
+              >
                 Cancel
               </button>
-              <button className="px-4 py-2 bg-blue-600 text-white rounded-md" onClick={handleAddLead}>
+              <button
+                onClick={handleAddLead}
+                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+              >
                 Add Lead
               </button>
             </div>
@@ -697,79 +772,196 @@ const LeadGenCRM: React.FC = () => {
       {/* Edit Lead Modal */}
       {selectedLead && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg max-w-md w-full p-6 max-h-[90vh] overflow-y-auto">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Edit Lead</h3>
+          <div className="bg-white rounded-lg max-w-md w-full p-6 max-h-[95vh] overflow-y-auto">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">
+              Edit Lead
+            </h3>
+
             <div className="space-y-4">
-              <LabeledInput
-                label="Customer Name"
-                value={selectedLead.customerName}
-                onChange={(v) => setSelectedLead({ ...selectedLead, customerName: v })}
-              />
-              <LabeledInput
-                label="Phone"
-                value={selectedLead.phone}
-                onChange={(v) => setSelectedLead({ ...selectedLead, phone: v })}
-              />
-              <LabeledInput
-                label="Email"
-                value={selectedLead.email}
-                onChange={(v) => setSelectedLead({ ...selectedLead, email: v })}
-              />
-              <LabeledInput
-                label="Service Needed"
-                value={selectedLead.serviceNeeded}
-                onChange={(v) => setSelectedLead({ ...selectedLead, serviceNeeded: v })}
-              />
-              <LabeledInput
-                label="Address"
-                value={selectedLead.address}
-                onChange={(v) => setSelectedLead({ ...selectedLead, address: v })}
-              />
-              <LabeledInput
-                label="Technician"
-                value={selectedLead.technician}
-                onChange={(v) => setSelectedLead({ ...selectedLead, technician: v })}
-                placeholder="Type technician name"
-              />
-              <LabeledInput
-                type="date"
-                label="Appointment Date"
-                value={selectedLead.appointmentDate || ""}
-                onChange={(v) => setSelectedLead({ ...selectedLead, appointmentDate: v })}
-              />
-              <LabeledInput
-                type="time"
-                label="Appointment Time"
-                value={selectedLead.appointmentTime || ""}
-                onChange={(v) => setSelectedLead({ ...selectedLead, appointmentTime: v })}
-              />
-              <LabeledTextArea
-                label="Notes"
-                value={selectedLead.notes}
-                onChange={(v) => setSelectedLead({ ...selectedLead, notes: v })}
-              />
+              {/* Customer Name */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Customer Name
+                </label>
+                <input
+                  type="text"
+                  value={selectedLead.customerName}
+                  onChange={(e) =>
+                    setSelectedLead({
+                      ...selectedLead,
+                      customerName: e.target.value,
+                    })
+                  }
+                  className="w-full px-3 py-2 border rounded-md focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+
+              {/* Phone */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Phone
+                </label>
+                <input
+                  type="tel"
+                  value={selectedLead.phone}
+                  onChange={(e) =>
+                    setSelectedLead({ ...selectedLead, phone: e.target.value })
+                  }
+                  className="w-full px-3 py-2 border rounded-md focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+
+              {/* Email */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Email
+                </label>
+                <input
+                  type="email"
+                  value={selectedLead.email}
+                  onChange={(e) =>
+                    setSelectedLead({ ...selectedLead, email: e.target.value })
+                  }
+                  className="w-full px-3 py-2 border rounded-md focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+
+              {/* Service Needed */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Service Needed
+                </label>
+                <input
+                  type="text"
+                  value={selectedLead.serviceNeeded}
+                  onChange={(e) =>
+                    setSelectedLead({
+                      ...selectedLead,
+                      serviceNeeded: e.target.value,
+                    })
+                  }
+                  className="w-full px-3 py-2 border rounded-md focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+
+              {/* Address */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Address
+                </label>
+                <input
+                  type="text"
+                  value={selectedLead.address}
+                  onChange={(e) =>
+                    setSelectedLead({ ...selectedLead, address: e.target.value })
+                  }
+                  className="w-full px-3 py-2 border rounded-md focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+
+              {/* Technician (free text) */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Technician
+                </label>
+                <input
+                  type="text"
+                  value={selectedLead.technician}
+                  onChange={(e) =>
+                    setSelectedLead({
+                      ...selectedLead,
+                      technician: e.target.value,
+                    })
+                  }
+                  className="w-full px-3 py-2 border rounded-md focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+
+              {/* Appointment Date */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Appointment Date
+                </label>
+                <input
+                  type="date"
+                  value={selectedLead.appointmentDate || ""}
+                  onChange={(e) =>
+                    setSelectedLead({
+                      ...selectedLead,
+                      appointmentDate: e.target.value || null,
+                    })
+                  }
+                  className="w-full px-3 py-2 border rounded-md focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+
+              {/* Appointment Time */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Appointment Time
+                </label>
+                <input
+                  type="time"
+                  value={selectedLead.appointmentTime || ""}
+                  onChange={(e) =>
+                    setSelectedLead({
+                      ...selectedLead,
+                      appointmentTime: e.target.value,
+                    })
+                  }
+                  className="w-full px-3 py-2 border rounded-md focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+
+              {/* Notes */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Notes
+                </label>
+                <textarea
+                  value={selectedLead.notes}
+                  onChange={(e) =>
+                    setSelectedLead({ ...selectedLead, notes: e.target.value })
+                  }
+                  rows={3}
+                  className="w-full px-3 py-2 border rounded-md focus:ring-blue-500 focus:border-blue-500"
+                />
+              </div>
+
+              {/* Status */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Status
+                </label>
                 <select
                   value={selectedLead.status}
-                  onChange={(e) => setSelectedLead({ ...selectedLead, status: e.target.value as StatusValue })}
+                  onChange={(e) =>
+                    setSelectedLead({ ...selectedLead, status: e.target.value })
+                  }
                   className="w-full px-3 py-2 border rounded-md focus:ring-blue-500 focus:border-blue-500"
                 >
-                  {STATUS_OPTIONS.map((s) => (
-                    <option key={s.value} value={s.value}>
-                      {s.label}
+                  {STATUS_OPTIONS.map((opt) => (
+                    <option key={opt.value} value={opt.value}>
+                      {opt.label}
                     </option>
                   ))}
                 </select>
               </div>
             </div>
+
             <div className="flex justify-end gap-3 mt-6">
-              <button className="px-4 py-2 text-gray-700 border rounded-md" onClick={() => setSelectedLead(null)}>
+              <button
+                onClick={() => setSelectedLead(null)}
+                className="px-4 py-2 text-gray-700 border rounded-md hover:bg-gray-50"
+              >
                 Cancel
               </button>
               <button
-                className="px-4 py-2 bg-blue-600 text-white rounded-md"
-                onClick={() => handleLeadUpdate(selectedLead.id, selectedLead)}
+                onClick={() =>
+                  selectedLead &&
+                  handleLeadUpdate(selectedLead.id, { ...selectedLead })
+                }
+                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
               >
                 Save Changes
               </button>
@@ -780,50 +972,5 @@ const LeadGenCRM: React.FC = () => {
     </div>
   );
 };
-
-/* ------------------------------------------------------------
-   Small UI helpers
-------------------------------------------------------------- */
-const StatCard: React.FC<{ title: string; value: number | string }> = ({ title, value }) => (
-  <div className="bg-white border rounded-lg shadow-sm p-4">
-    <div className="text-2xl font-bold text-gray-900">{value}</div>
-    <div className="text-sm text-gray-600">{title}</div>
-  </div>
-);
-
-const LabeledInput: React.FC<{
-  label: string;
-  value: string;
-  onChange: (v: string) => void;
-  type?: string;
-  placeholder?: string;
-}> = ({ label, value, onChange, type = "text", placeholder }) => (
-  <div>
-    <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
-    <input
-      type={type}
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      placeholder={placeholder}
-      className="w-full px-3 py-2 border rounded-md focus:ring-blue-500 focus:border-blue-500"
-    />
-  </div>
-);
-
-const LabeledTextArea: React.FC<{
-  label: string;
-  value: string;
-  onChange: (v: string) => void;
-}> = ({ label, value, onChange }) => (
-  <div>
-    <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
-    <textarea
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      rows={3}
-      className="w-full px-3 py-2 border rounded-md focus:ring-blue-500 focus:border-blue-500"
-    />
-  </div>
-);
 
 export default LeadGenCRM;
