@@ -340,57 +340,23 @@ const LeadGenCRM: React.FC = () => {
             </h3>
           )}
 
-          {/* 2) Phone + line name + actions */}
-          <div className="flex justify-between items-start gap-2">
-            {/* left column must be able to shrink */}
-            <div className="min-w-0 text-sm text-gray-700 space-y-1">
-              {/* Phone */}
-              <div className="flex items-center gap-2">
-                <Phone className="w-4 h-4 text-gray-500" />
-                <span className="font-medium">{lead.phone || "—"}</span>
+          {/* 2) Phone + line name (no action icons here anymore) */}
+          <div className="text-sm text-gray-700 space-y-1 min-w-0">
+            {/* Phone */}
+            <div className="flex items-center gap-2">
+              <Phone className="w-4 h-4 text-gray-500" />
+              <span className="font-medium">{lead.phone || "—"}</span>
+            </div>
+
+            {/* Line name */}
+            {lead.lineName && (
+              <div className="flex items-start gap-2">
+                <span className="text-gray-500 shrink-0">Line:</span>
+                <span className="font-medium truncate block max-w-full">
+                  {lead.lineName}
+                </span>
               </div>
-
-              {/* Line name */}
-              {lead.lineName && (
-                <div className="flex items-start gap-2">
-                  <span className="text-gray-500 shrink-0">Line:</span>
-                  <span className="font-medium truncate block max-w-full">
-                    {lead.lineName}
-                  </span>
-                </div>
-              )}
-            </div>
-
-            {/* Action Icons (must not shrink) */}
-            <div className="shrink-0 flex items-center gap-2">
-              {lead.openphoneUrl ? (
-                <a
-                  href={lead.openphoneUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  title="Open chat in OpenPhone"
-                  className="p-1.5 rounded hover:bg-gray-100"
-                >
-                  <ExternalLink className="w-4 h-4 text-blue-600" />
-                </a>
-              ) : null}
-
-              <button
-                onClick={() => setSelectedLead(lead)}
-                title="Edit"
-                className="p-1.5 rounded hover:bg-gray-100 text-gray-500 hover:text-blue-600"
-              >
-                <Edit3 className="w-4 h-4" />
-              </button>
-
-              <button
-                onClick={() => handleDeleteLead(lead.id)}
-                title="Delete"
-                className="p-1.5 rounded hover:bg-gray-100 text-gray-500 hover:text-red-600"
-              >
-                <Trash2 className="w-4 h-4" />
-              </button>
-            </div>
+            )}
           </div>
 
           {/* 3) Service Needed */}
@@ -442,10 +408,42 @@ const LeadGenCRM: React.FC = () => {
             <StatusPill status={lead.status} leadId={lead.id} />
           </div>
 
-          {/* 9) Timestamp */}
-          <div className="text-xs text-gray-400 flex items-center gap-1 pt-1">
-            <Clock className="w-3 h-3" />
-            <span>Added {new Date(lead.dateAdded).toLocaleString()}</span>
+          {/* 9) Footer row: timestamp left, actions right */}
+          <div className="pt-1 flex items-center justify-between">
+            <div className="text-xs text-gray-400 flex items-center gap-1">
+              <Clock className="w-3 h-3" />
+              <span>Added {new Date(lead.dateAdded).toLocaleString()}</span>
+            </div>
+
+            <div className="shrink-0 flex items-center gap-2">
+              {lead.openphoneUrl ? (
+                <a
+                  href={lead.openphoneUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  title="Open chat in OpenPhone"
+                  className="p-1.5 rounded hover:bg-gray-100"
+                >
+                  <ExternalLink className="w-4 h-4 text-blue-600" />
+                </a>
+              ) : null}
+
+              <button
+                onClick={() => setSelectedLead(lead)}
+                title="Edit"
+                className="p-1.5 rounded hover:bg-gray-100 text-gray-500 hover:text-blue-600"
+              >
+                <Edit3 className="w-4 h-4" />
+              </button>
+
+              <button
+                onClick={() => handleDeleteLead(lead.id)}
+                title="Delete"
+                className="p-1.5 rounded hover:bg-gray-100 text-gray-500 hover:text-red-600"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            </div>
           </div>
         </div>
       </div>
