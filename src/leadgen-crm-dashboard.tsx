@@ -25,7 +25,7 @@ import {
   addLead,
   updateLead,
   deleteLead,
-  fetchTechnicians, // still used to prefill modal helper, but the Technician field is free text now
+  fetchTechnicians,
 } from "./data";
 
 /* ------------------------------------------------------------------ */
@@ -109,7 +109,7 @@ const LeadGenCRM: React.FC = () => {
   const [showAddLead, setShowAddLead] = useState(false);
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
 
-  const [technicians, setTechnicians] = useState<string[]>([]); // optional helper list for you
+  const [technicians, setTechnicians] = useState<string[]>([]);
   const [leads, setLeads] = useState<Lead[]>([]);
 
   /* ------------------------- Fetch initial data ------------------------- */
@@ -333,35 +333,36 @@ const LeadGenCRM: React.FC = () => {
         )}
 
         <div className="space-y-3">
-          {/* 1) Customer Name (top line, bold) */}
+          {/* 1) Customer Name */}
           {lead.customerName && (
             <h3 className="text-base font-semibold text-gray-900 break-words">
               {lead.customerName}
             </h3>
           )}
 
-          {/* 2) Phone + line name + (Open chat icon) */}
+          {/* 2) Phone + line name + actions */}
           <div className="flex justify-between items-start gap-2">
-            <div className="text-sm text-gray-700 space-y-1">
+            {/* left column must be able to shrink */}
+            <div className="min-w-0 text-sm text-gray-700 space-y-1">
               {/* Phone */}
               <div className="flex items-center gap-2">
-                <Phone className="w-3.5 h-3.5 text-gray-500" />
+                <Phone className="w-4 h-4 text-gray-500" />
                 <span className="font-medium">{lead.phone || "—"}</span>
               </div>
 
               {/* Line name */}
               {lead.lineName && (
                 <div className="flex items-start gap-2">
-                  <span className="text-gray-500">Line:</span>
-                  <span className="font-medium truncate inline-block max-w-[240px] align-bottom">
+                  <span className="text-gray-500 shrink-0">Line:</span>
+                  <span className="font-medium truncate block max-w-full">
                     {lead.lineName}
                   </span>
                 </div>
               )}
             </div>
 
-            {/* Action Icons: open chat, edit, delete */}
-            <div className="flex items-center gap-2">
+            {/* Action Icons (must not shrink) */}
+            <div className="shrink-0 flex items-center gap-2">
               {lead.openphoneUrl ? (
                 <a
                   href={lead.openphoneUrl}
@@ -370,7 +371,7 @@ const LeadGenCRM: React.FC = () => {
                   title="Open chat in OpenPhone"
                   className="p-1.5 rounded hover:bg-gray-100"
                 >
-                  <ExternalLink className="w-4.5 h-4.5 text-blue-600" />
+                  <ExternalLink className="w-4 h-4 text-blue-600" />
                 </a>
               ) : null}
 
@@ -379,7 +380,7 @@ const LeadGenCRM: React.FC = () => {
                 title="Edit"
                 className="p-1.5 rounded hover:bg-gray-100 text-gray-500 hover:text-blue-600"
               >
-                <Edit3 className="w-4.5 h-4.5" />
+                <Edit3 className="w-4 h-4" />
               </button>
 
               <button
@@ -387,7 +388,7 @@ const LeadGenCRM: React.FC = () => {
                 title="Delete"
                 className="p-1.5 rounded hover:bg-gray-100 text-gray-500 hover:text-red-600"
               >
-                <Trash2 className="w-4.5 h-4.5" />
+                <Trash2 className="w-4 h-4" />
               </button>
             </div>
           </div>
@@ -403,7 +404,7 @@ const LeadGenCRM: React.FC = () => {
           {/* 4) Address */}
           {lead.address && (
             <div className="flex items-start gap-2 text-sm text-gray-700">
-              <MapPin className="w-3.5 h-3.5 mt-0.5 text-gray-500 shrink-0" />
+              <MapPin className="w-4 h-4 mt-0.5 text-gray-500 shrink-0" />
               <span className="break-words">{lead.address}</span>
             </div>
           )}
@@ -420,7 +421,7 @@ const LeadGenCRM: React.FC = () => {
           {(lead.appointmentDate || lead.appointmentTime) && (
             <div className="bg-green-50 border border-green-100 rounded p-2 text-sm text-green-900 space-y-1">
               <div className="flex items-center gap-2">
-                <Calendar className="w-3.5 h-3.5" />
+                <Calendar className="w-4 h-4" />
                 <span>
                   {lead.appointmentDate || "—"}
                   {lead.appointmentTime ? ` at ${lead.appointmentTime}` : ""}
@@ -436,7 +437,7 @@ const LeadGenCRM: React.FC = () => {
             </p>
           )}
 
-          {/* 8) Status (compact dropdown) */}
+          {/* 8) Status */}
           <div className="pt-1">
             <StatusPill status={lead.status} leadId={lead.id} />
           </div>
@@ -452,28 +453,30 @@ const LeadGenCRM: React.FC = () => {
   };
 
   /* ------------------------------- Nav list ------------------------------ */
+  const getLeadsBy = (id: string) => getLeadsByStatus(id).length;
+
   const navItems = [
     { id: "dashboard", label: "Dashboard", icon: Home },
-    { id: "new", label: "New Lead", icon: AlertCircle, count: getLeadsByStatus("new").length },
+    { id: "new", label: "New Lead", icon: AlertCircle, count: getLeadsBy("new") },
 
-    { id: "waiting-more-details", label: "Waiting for More Details …", icon: Phone, count: getLeadsByStatus("waiting-more-details").length },
-    { id: "waiting-new-tech", label: "Waiting for New Tech", icon: Users, count: getLeadsByStatus("waiting-new-tech").length },
-    { id: "waiting-customer-response", label: "Waiting for customer res…", icon: Mail, count: getLeadsByStatus("waiting-customer-response").length },
-    { id: "quote-sent", label: "Quote Sent / Waiting …", icon: Mail, count: getLeadsByStatus("quote-sent").length },
+    { id: "waiting-more-details", label: "Waiting for More Details …", icon: Phone, count: getLeadsBy("waiting-more-details") },
+    { id: "waiting-new-tech", label: "Waiting for New Tech", icon: Users, count: getLeadsBy("waiting-new-tech") },
+    { id: "waiting-customer-response", label: "Waiting for customer res…", icon: Mail, count: getLeadsBy("waiting-customer-response") },
+    { id: "quote-sent", label: "Quote Sent / Waiting …", icon: Mail, count: getLeadsBy("quote-sent") },
 
-    { id: "reschedule", label: "Reschedule", icon: RotateCcw, count: getLeadsByStatus("reschedule").length },
-    { id: "free-estimate-scheduled", label: "Free Estimate Scheduled", icon: Calendar, count: getLeadsByStatus("free-estimate-scheduled").length },
-    { id: "service-diagnostic-scheduled", label: "Service / Diagnostic Call …", icon: Calendar, count: getLeadsByStatus("service-diagnostic-scheduled").length },
-    { id: "visiting-charges-scheduled", label: "Visiting Charges Scheduled", icon: Calendar, count: getLeadsByStatus("visiting-charges-scheduled").length },
-    { id: "in-progress", label: "In Progress", icon: Users, count: getLeadsByStatus("in-progress").length },
+    { id: "reschedule", label: "Reschedule", icon: RotateCcw, count: getLeadsBy("reschedule") },
+    { id: "free-estimate-scheduled", label: "Free Estimate Scheduled", icon: Calendar, count: getLeadsBy("free-estimate-scheduled") },
+    { id: "service-diagnostic-scheduled", label: "Service / Diagnostic Call …", icon: Calendar, count: getLeadsBy("service-diagnostic-scheduled") },
+    { id: "visiting-charges-scheduled", label: "Visiting Charges Scheduled", icon: Calendar, count: getLeadsBy("visiting-charges-scheduled") },
+    { id: "in-progress", label: "In Progress", icon: Users, count: getLeadsBy("in-progress") },
 
-    { id: "follow-up", label: "Follow Up with customer", icon: Phone, count: getLeadsByStatus("follow-up").length },
-    { id: "job-too-small", label: "Job Too Small", icon: XCircle, count: getLeadsByStatus("job-too-small").length },
-    { id: "no-tech-available", label: "Cancelled: no tech avail …", icon: XCircle, count: getLeadsByStatus("no-tech-available").length },
-    { id: "too-expensive", label: "Too expensive for custom…", icon: XCircle, count: getLeadsByStatus("too-expensive").length },
-    { id: "canceled", label: "Cancelled", icon: XCircle, count: getLeadsByStatus("canceled").length },
+    { id: "follow-up", label: "Follow Up with customer", icon: Phone, count: getLeadsBy("follow-up") },
+    { id: "job-too-small", label: "Job Too Small", icon: XCircle, count: getLeadsBy("job-too-small") },
+    { id: "no-tech-available", label: "Cancelled: no tech avail …", icon: XCircle, count: getLeadsBy("no-tech-available") },
+    { id: "too-expensive", label: "Too expensive for custom…", icon: XCircle, count: getLeadsBy("too-expensive") },
+    { id: "canceled", label: "Cancelled", icon: XCircle, count: getLeadsBy("canceled") },
 
-    { id: "sold", label: "Sold", icon: CheckCircle, count: getLeadsByStatus("sold").length },
+    { id: "sold", label: "Sold", icon: CheckCircle, count: getLeadsBy("sold") },
 
     { id: "analytics", label: "Analytics", icon: BarChart3 },
   ];
@@ -730,9 +733,6 @@ const LeadGenCRM: React.FC = () => {
                   value={newLead.technician}
                   onChange={(e) =>
                     setNewLead({ ...newLead, technician: e.target.value })
-                  }
-                  placeholder={
-                    technicians.length ? `e.g. ${technicians[0]}` : "Type name"
                   }
                   className="w-full px-3 py-2 border rounded-md focus:ring-blue-500 focus:border-blue-500"
                 />
