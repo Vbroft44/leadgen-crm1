@@ -629,19 +629,9 @@ const LeadGenCRM: React.FC = () => {
             )}
 
             {/* Analytics stub */}
-            {activeTab === "analytics" && (
-              <section className="bg-white rounded-lg shadow-sm border p-6">
-                <h2 className="text-xl font-semibold text-gray-900 mb-4">
-                  Analytics
-                </h2>
-                <p className="text-gray-600">
-                  (Add charts here later if you’d like.)
-                </p>
-              </section>
+            {activeTab === 'analytics' && (
+              <AnalyticsPanel leads={leads} />
             )}
-          </main>
-        </div>
-      </div>
 
       {/* Add Lead Modal */}
       {showAddLead && (
