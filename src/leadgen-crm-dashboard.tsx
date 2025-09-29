@@ -186,6 +186,42 @@ const LeadGenCRM: React.FC = () => {
     };
   }, [leads]);
 
+  /** ---------------------- Analytics (last 14 days) ---------------------- **/
+  const analytics14 = useMemo(() => {
+    // Build date keys for the last 14 days (oldest -> newest)
+    const days: { label: string; key: string }[] = [];
+    for (let i = 13; i >= 0; i--) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const key = d.toISOString().slice(0, 10); // YYYY-MM-DD
+      const label = `${d.getMonth() + 1}/${d.getDate()}`; // M/D
+      days.push({ label, key });
+    }
+
+    // Count leads created per day
+    const perDayCounts = days.map(({ key, label }) => {
+      const count = leads.filter((l) => {
+        const d = new Date(l.dateAdded);
+        const ymd = d.toISOString().slice(0, 10);
+        return ymd === key;
+      }).length;
+      return { label, count };
+    });
+
+    // Overall status counts (pipeline = not sold/canceled)
+    const statusCounts: Record<string, number> = {};
+    for (const s of STATUS_OPTIONS) statusCounts[s.value] = 0;
+    for (const l of leads) statusCounts[l.status] = (statusCounts[l.status] || 0) + 1;
+
+    const pipeline = leads.filter((l) => !["sold", "canceled"].includes(l.status)).length;
+    const soldAll = statusCounts["sold"] ?? 0;
+    const canceledAll = statusCounts["canceled"] ?? 0;
+
+    const maxBar = Math.max(1, ...perDayCounts.map((d) => d.count));
+
+    return { perDayCounts, maxBar, pipeline, soldAll, canceledAll, statusCounts };
+  }, [leads]);
+
   const handleStatusChange = async (leadId: number, newStatus: string) => {
     setLeads((prev) =>
       prev.map((l) =>
@@ -628,15 +664,72 @@ const LeadGenCRM: React.FC = () => {
               </section>
             )}
 
-            {/* Analytics stub */}
+            {/* Analytics page */}
             {activeTab === "analytics" && (
-              <section className="bg-white rounded-lg shadow-sm border p-6">
-                <h2 className="text-xl font-semibold text-gray-900 mb-4">
-                  Analytics
-                </h2>
-                <p className="text-gray-600">
-                  (Add charts here later if you’d like.)
-                </p>
+              <section className="bg-white rounded-lg shadow-sm border p-6 space-y-6">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-xl font-semibold text-gray-900">Analytics</h2>
+                  <span className="text-sm text-gray-500">Auto-updated from current leads</span>
+                </div>
+
+                {/* Top KPIs */}
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <div className="bg-white border rounded-lg p-4">
+                    <div className="text-2xl font-bold text-blue-600">{analytics.totalToday}</div>
+                    <div className="text-sm text-gray-600">New Today</div>
+                  </div>
+                  <div className="bg-white border rounded-lg p-4">
+                    <div className="text-2xl font-bold text-green-600">{analytics14.soldAll}</div>
+                    <div className="text-sm text-gray-600">Sold (All-time)</div>
+                  </div>
+                  <div className="bg-white border rounded-lg p-4">
+                    <div className="text-2xl font-bold text-orange-600">{analytics14.pipeline}</div>
+                    <div className="text-sm text-gray-600">Open Pipeline</div>
+                  </div>
+                  <div className="bg-white border rounded-lg p-4">
+                    <div className="text-2xl font-bold text-red-600">{analytics14.canceledAll}</div>
+                    <div className="text-sm text-gray-600">Canceled (All-time)</div>
+                  </div>
+                </div>
+
+                {/* Skinny bar chart: Leads per day (last 14 days) */}
+                <div className="bg-white border rounded-lg p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-md font-semibold text-gray-900">Leads per day (last 14 days)</h3>
+                    <span className="text-xs text-gray-500">Counts based on date added</span>
+                  </div>
+
+                  <div className="h-32 w-full flex items-end gap-2">
+                    {analytics14.perDayCounts.map((d, idx) => (
+                      <div key={idx} className="flex-1 flex flex-col items-center gap-1">
+                        <div
+                          className="w-full bg-blue-500 rounded"
+                          style={{
+                            height: `${(d.count / analytics14.maxBar) * 100}%`,
+                            minHeight: d.count > 0 ? "8px" : "0px",
+                          }}
+                          title={`${d.label}: ${d.count}`}
+                        />
+                        <div className="text-[10px] text-gray-500">{d.label}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Status breakdown */}
+                <div className="bg-white border rounded-lg p-4">
+                  <h3 className="text-md font-semibold text-gray-900 mb-3">Status Breakdown</h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {STATUS_OPTIONS.map((s) => (
+                      <div key={s.value} className="flex items-center justify-between border rounded-md px-3 py-2">
+                        <span className="text-sm text-gray-700 truncate">{s.label}</span>
+                        <span className="text-sm font-semibold text-gray-900">
+                          {analytics14.statusCounts[s.value] ?? 0}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </section>
             )}
           </main>
